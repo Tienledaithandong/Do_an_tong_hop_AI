@@ -52,6 +52,23 @@ def degree_stats(adj: sparse.spmatrix) -> dict[str, float]:
     }
 
 
+def average_path_length(adj: sparse.spmatrix) -> float:
+    """Mean shortest-path length over all reachable ordered pairs.
+
+    Disconnected graphs average only over pairs that can reach each other, so a
+    fragmented swarm still yields a finite (but smaller) distance scale.
+    """
+    adj = sparse.csr_matrix(adj)
+    if adj.shape[0] < 2:
+        return 0.0
+    distances = sparse.csgraph.shortest_path(adj, unweighted=True, directed=False)
+    finite = distances[np.isfinite(distances)]
+    off_diagonal = finite.size - np.isfinite(np.diag(distances)).sum()
+    if off_diagonal <= 0:
+        return 0.0
+    return float((finite.sum() - 0.0) / off_diagonal)
+
+
 def relaxation_time(adj: sparse.spmatrix) -> tuple[float, float]:
     """Return ``(lambda2, tau)``; disconnected graphs give ``tau = inf``."""
     adj = sparse.csr_matrix(adj, dtype=float)
