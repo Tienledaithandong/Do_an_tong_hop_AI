@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from scipy import sparse
 
-from hive.graphs import degree_stats, is_connected, relaxation_time, rgg_graph, ws_graph
+from hive.graphs import two_room_graph, degree_stats, is_connected, relaxation_time, rgg_graph, ws_graph
 
 
 def complete_graph_adj(n: int) -> sparse.csr_matrix:
@@ -44,3 +44,13 @@ def test_large_radius_rgg_is_connected():
     stats = degree_stats(adj)
     assert stats["mean"] > 0
     assert stats["max"] >= stats["mean"] >= stats["min"]
+
+
+def test_two_room_graph_has_bottleneck() -> None:
+    adj = two_room_graph(50, bridge=2, seed=0)
+    assert is_connected(adj)
+    lambda2, tau = relaxation_time(adj)
+    assert np.isfinite(lambda2)
+    # Narrow bridge must inflate tau by an order of magnitude vs a clique.
+    _, tau_clique = relaxation_time(complete_graph_adj(50))
+    assert tau > 10 * tau_clique

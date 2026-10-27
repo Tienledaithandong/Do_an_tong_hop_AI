@@ -69,6 +69,44 @@ def average_path_length(adj: sparse.spmatrix) -> float:
     return float((finite.sum() - 0.0) / off_diagonal)
 
 
+def two_room_graph(n: int, bridge: int = 3, seed: int | None = None) -> sparse.csr_matrix:
+    """Two dense rooms joined by a narrow bridge (a mixing bottleneck).
+
+    The narrow bridge dramatically slows random-walk mixing (large tau) while
+    only modestly increasing shortest-path length (L), so tau and L decouple.
+    """
+    rng = np.random.default_rng(seed)
+    half = n // 2
+    n1, n2 = half, n - half
+
+    k = min(bridge, n1, n2)
+    bridge_a = rng.choice(n1, size=k, replace=False)
+    bridge_b = rng.choice(n2, size=k, replace=False)
+
+    row: list[int] = []
+    col: list[int] = []
+
+    def add(i: int, j: int) -> None:
+        row.append(i)
+        col.append(j)
+        row.append(j)
+        col.append(i)
+
+    # Room A: complete graph on [0, n1)
+    for i in range(n1):
+        for j in range(i + 1, n1):
+            add(i, j)
+    # Room B: complete graph on [n1, n)
+    for i in range(n1, n):
+        for j in range(i + 1, n):
+            add(i, j)
+    # Bridge: connect corresponding endpoints between rooms
+    for a, b in zip(bridge_a, bridge_b):
+        add(a, n1 + b)
+
+    return sparse.csr_matrix((np.ones(len(row)), (row, col)), shape=(n, n))
+
+
 def relaxation_time(adj: sparse.spmatrix) -> tuple[float, float]:
     """Return ``(lambda2, tau)``; disconnected graphs give ``tau = inf``."""
     adj = sparse.csr_matrix(adj, dtype=float)

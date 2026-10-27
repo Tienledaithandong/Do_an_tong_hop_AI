@@ -13,13 +13,21 @@ import pandas as pd
 from scipy import sparse
 
 from .bandit import Bandit, make_q
-from .graphs import average_path_length, degree_stats, relaxation_time, rgg_graph, ws_graph
+from .graphs import (
+    average_path_length,
+    degree_stats,
+    relaxation_time,
+    rgg_graph,
+    two_room_graph,
+    ws_graph,
+)
 from .metrics import best_mass, consensus, l2_to_reference, t90
 from .models import mrd_step
 from .swarm import graph_voter, well_mixed_voter
 
 WS_P: list[float] = [0.0, 1e-4, 1e-3, 0.01, 0.05, 0.1, 0.2, 0.4, 0.7, 1.0]
 RGG_C: list[float] = [1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.5]
+BRIDGE_P: list[float] = [1.0, 3.0, 6.0]
 
 
 def _initial_types(rng: np.random.Generator, n: int, N: int) -> np.ndarray:
@@ -122,6 +130,8 @@ def run_graph_sweep(
     rc = float(np.sqrt(np.log(N) / (np.pi * N)))
     for c in rgg_c:
         configs.append(("rgg", float(c), rgg_graph(N, c * rc, seed=0), "graph"))
+    for b in BRIDGE_P:
+        configs.append(("two_room", float(b), two_room_graph(N, bridge=int(b), seed=0), "graph"))
 
     rows: list[dict[str, float | str | int]] = []
     mean_curves: dict[str, np.ndarray] = {}
