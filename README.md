@@ -16,6 +16,9 @@ python -m venv .venv
 source .venv/bin/activate
 
 pip install -r requirements.txt
+
+> `requirements.txt` is mirrored in `pyproject.toml`; project metadata
+> (name, version, Python requirement) lives in `pyproject.toml`.
 ```
 
 ## Chạy thí nghiệm
@@ -49,9 +52,9 @@ python scripts/check_heavy_tail.py
 python -m pytest -q
 ```
 
-`pytest.ini` đã thêm `src` vào `pythonpath`, nên không cần đặt biến môi
-trường `PYTHONPATH` khi chạy test. `scripts/run_all.py` cũng tự thêm `src`
-vào `sys.path`.
+`pyproject.toml` ([tool.pytest.ini_options]) đã thêm `src` vào `pythonpath`,
+nên không cần đặt biến môi trường `PYTHONPATH` khi chạy test.
+`scripts/run_all.py` cũng tự thêm `src` vào `sys.path`.
 
 ## Dựng báo cáo PDF
 
@@ -75,11 +78,12 @@ src/hive/          thư viện mô phỏng
   reproduce.py     thí nghiệm A (tái tạo)
   graph_sweep.py   thí nghiệm B (khảo sát đồ thị)
   plots.py         hình cho báo cáo
+  config.py        cấu hình chung (RUN_ALL, HEAVY_TAIL, tham số đồ thị)
 scripts/           pipeline, kiểm tra đuôi nặng, dựng PDF
 tests/             kiểm thử đơn vị
-results/           CSV / NPZ sinh bởi pipeline
-figures/           hình PNG / PDF
-report/            report.md và report.pdf
+results/           CSV / NPZ sinh bởi pipeline (gitignored)
+figures/           hình PNG / PDF (gitignored)
+report/            report.md (nguồn) và report.pdf (tự động sinh)
 ```
 
 ## Bản đồ hình và bảng
@@ -98,3 +102,5 @@ report/            report.md và report.pdf
   cho `n > 512`, nên đúng cả với đồ thị bipartite.
 - Kết quả trong báo cáo được sinh từ cùng một lần chạy với seed cố định;
   chạy lại có thể lệch ở mức làm tròn nhưng các kết luận định tính giữ nguyên.
+- `results/`, `figures/` và `report/report.pdf` là đầu ra tự động sinh và
+  đã được `.gitignore`, nên không bị commit vào repository.

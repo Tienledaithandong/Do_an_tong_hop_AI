@@ -25,9 +25,7 @@ from .metrics import best_mass, consensus, l2_to_reference, t90
 from .models import mrd_step
 from .swarm import graph_voter, well_mixed_voter
 
-WS_P: list[float] = [0.0, 1e-4, 1e-3, 0.01, 0.05, 0.1, 0.2, 0.4, 0.7, 1.0]
-RGG_C: list[float] = [1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.5]
-BRIDGE_P: list[float] = [1.0, 3.0, 6.0]
+from hive.config import WS_P, RGG_C, BRIDGE_P
 
 
 def _initial_types(rng: np.random.Generator, n: int, N: int) -> np.ndarray:

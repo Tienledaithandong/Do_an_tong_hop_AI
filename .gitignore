@@ -15,3 +15,10 @@ out/
 # Intermediates from the PDF build
 report/preview*.png
 report/_preview_*.png
+
+# Reproducible experiment outputs (regeneratable via scripts/run_all.py)
+results/
+figures/
+
+# Final report deliverable (regeneratable via scripts/build_report.py)
+report/report.pdf

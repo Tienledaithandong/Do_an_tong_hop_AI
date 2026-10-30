@@ -20,7 +20,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from hive.bandit import make_q
-from hive.graph_sweep import WS_P, reference_mrd, run_graph_sweep
+from hive.config import HEAVY_TAIL, RUN_ALL
+from hive.graph_sweep import reference_mrd, run_graph_sweep
 from hive.plots import config_summary, plot_law, plot_reproduction, plot_trajectories
 from hive.reproduce import run_reproduction
 
@@ -29,11 +30,7 @@ FIGURES = ROOT / "figures"
 
 
 def _reproduction(quick: bool) -> None:
-    kwargs = (
-        dict(N=300, steps=120, seeds=20)
-        if quick
-        else dict(N=1000, steps=300, seeds=100)
-    )
+    kwargs = RUN_ALL["quick" if quick else "full"]["reproduction"]
     started = time.time()
     curves = run_reproduction(**kwargs)
     np.savez(RESULTS / "reproduction.npz", **curves)
@@ -48,11 +45,7 @@ def _reproduction(quick: bool) -> None:
 
 
 def _graph(quick: bool, replot: bool = False) -> None:
-    kwargs = (
-        dict(N=200, steps=120, seeds=12, ws_p=[0.01, 0.1, 1.0], rgg_c=[1.4, 2.0])
-        if quick
-        else dict(N=500, steps=400, seeds=100, ws_p=WS_P)
-    )
+    kwargs = RUN_ALL["quick" if quick else "full"]["graph"]
     started = time.time()
     if replot:
         df = pd.read_csv(RESULTS / "graph_sweep.csv")

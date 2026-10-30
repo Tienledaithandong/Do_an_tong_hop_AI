@@ -14,6 +14,16 @@ import numpy as np
 from scipy import sparse
 from scipy.sparse import linalg as spla
 
+__all__ = [
+    "ws_graph",
+    "rgg_graph",
+    "is_connected",
+    "degree_stats",
+    "average_path_length",
+    "two_room_graph",
+    "relaxation_time",
+]
+
 
 def ws_graph(n: int, k: int, p: float, seed: int | None = None) -> sparse.csr_matrix:
     """Watts-Strogatz small-world graph; ``p=0`` is a ring lattice."""

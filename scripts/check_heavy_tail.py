@@ -17,6 +17,7 @@ import sys
 from pathlib import Path
 
 import networkx as nx
+from scipy import sparse
 import numpy as np
 import pandas as pd
 
@@ -24,19 +25,20 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from hive.bandit import make_q
+from hive.config import HEAVY_TAIL
 from hive.graphs import average_path_length, degree_stats, relaxation_time
 from hive.graph_sweep import simulate_on_graph
 
-N = 500
-STEPS = 400
-SEEDS = 100
-N_TYPES = 10
-SCENARIO = "middle"
-INTERCEPT = 44.85
-SLOPE = 3.46
+N = HEAVY_TAIL["n"]
+STEPS = HEAVY_TAIL["steps"]
+SEEDS = HEAVY_TAIL["seeds"]
+N_TYPES = HEAVY_TAIL["n_types"]
+SCENARIO = HEAVY_TAIL["scenario"]
+INTERCEPT = HEAVY_TAIL["intercept"]
+SLOPE = HEAVY_TAIL["slope"]
 
 
-def to_csr(graph: nx.Graph):
+def to_csr(graph: nx.Graph) -> sparse.csr_matrix:
     return nx.to_scipy_sparse_array(
         graph,
         nodelist=list(range(graph.number_of_nodes())),
@@ -63,7 +65,7 @@ def main() -> int:
             adj, q, steps=STEPS, seeds=SEEDS, n_types=N_TYPES
         )
         median_t90 = float(np.median(result["t90"]))
-        prediction = INTERCEPT + SLOPE * path_length
+        prediction = HEAVY_TAIL["intercept"] + HEAVY_TAIL["slope"] * path_length
         rows.append(
             {
                 "family": name,

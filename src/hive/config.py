@@ -1,0 +1,52 @@
+"""Shared experiment configuration.
+
+Single source of truth for the knobs used by ``scripts/run_all.py`` and
+``scripts/check_heavy_tail.py`` so the quick/full runs and the heavy-tail
+reference values cannot drift apart.
+"""
+
+from __future__ import annotations
+
+# Graph families swept in Experiment B. Kept in one place so scripts and
+# report do not hardcode the same lists in two places.
+WS_P: list[float] = [0.0, 1e-4, 1e-3, 0.01, 0.05, 0.1, 0.2, 0.4, 0.7, 1.0]
+RGG_C: list[float] = [1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.5]
+BRIDGE_P: list[float] = [1.0, 3.0, 6.0]
+
+# Defaults for scripts/run_all.py. ``full`` runs the complete experiments;
+# ``quick`` is a smoke test that finishes in a few seconds.
+RUN_ALL: dict[str, dict[str, dict]] = {
+    "full": {
+        "reproduction": {"N": 1000, "steps": 300, "seeds": 100},
+        "graph": {
+            "N": 500,
+            "steps": 400,
+            "seeds": 100,
+            "ws_p": WS_P,
+            "rgg_c": RGG_C,
+        },
+    },
+    "quick": {
+        "reproduction": {"N": 300, "steps": 120, "seeds": 20},
+        "graph": {
+            "N": 200,
+            "steps": 120,
+            "seeds": 12,
+            "ws_p": [0.01, 0.1, 1.0],
+            "rgg_c": [1.4, 2.0],
+        },
+    },
+}
+
+# Calibration line used by scripts/check_heavy_tail.py to judge the
+# t90 ~ L law on heavy-tailed networks. Fitted in the report on the 16
+# non-intervention configurations (see ``hive.plots.fit_law``).
+HEAVY_TAIL: dict = {
+    "n": 500,
+    "steps": 400,
+    "seeds": 100,
+    "n_types": 10,
+    "scenario": "middle",
+    "intercept": 44.85,
+    "slope": 3.46,
+}
