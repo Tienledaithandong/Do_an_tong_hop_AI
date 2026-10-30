@@ -16,7 +16,12 @@ def _smooth(curve: np.ndarray, window: int) -> np.ndarray:
     if window <= 1 or curve.size == 0:
         return curve
     kernel = np.ones(window) / window
-    return np.convolve(curve, kernel, mode="same")
+    # Pad with the edge value, not zeros: zero-padding drags the smoothed
+    # curve down near the horizon and turns late crossings into censored runs.
+    left = (window - 1) // 2
+    right = window - 1 - left
+    padded = np.pad(curve, (left, right), mode="edge")
+    return np.convolve(padded, kernel, mode="valid")
 
 
 def t90(

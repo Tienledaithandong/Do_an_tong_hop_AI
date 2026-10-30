@@ -22,6 +22,15 @@ def test_t90_reports_censoring_when_never_reached():
     assert step == 50
 
 
+def test_t90_does_not_censor_a_crossing_at_the_end_of_the_window():
+    # Four consecutive hits at the end are enough for a centred 5-step
+    # average to reach 0.9 once the boundary is padded with the edge value.
+    curve = np.concatenate([np.full(396, 0.1), np.full(4, 1.0)])
+    step, hit = t90(curve, threshold=0.9, window=5)
+    assert hit
+    assert step == 398
+
+
 def test_consensus_is_max_policy_component():
     assert consensus(np.array([0.1, 0.7, 0.2])) == pytest.approx(0.7)
 

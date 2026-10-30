@@ -1,15 +1,17 @@
-.venv/
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+.venv/
 .pytest_cache/
-results/
+*.egg-info/
+
+# Agent / tooling workspace
 .superpowers/
--
-AI
-Tổng
-hợp
-nul
-án
-out/_full2.log
-hợp
-worktree
+.waylog/
+
+# Scratch outputs (the reproducible results live in results/)
+out/
+
+# Intermediates from the PDF build
+report/preview*.png
+report/_preview_*.png

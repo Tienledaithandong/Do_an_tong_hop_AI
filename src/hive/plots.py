@@ -16,6 +16,7 @@ COLORS = {
     "well_mixed": "#1f77b4",
     "pmcl": "#ff7f0e",
     "mrd": "#2ca02c",
+    "two_room": "#2ca02c",
     "ws": "#1f77b4",
     "rgg": "#d62728",
 }
@@ -38,9 +39,9 @@ def plot_reproduction(curves: dict[str, np.ndarray], out_dir: Path) -> list[Path
     fig, ax = plt.subplots(figsize=(7.0, 4.4))
 
     styles = {
-        "well_mixed": ("Weighted voter (swarm)", "-", COLORS["well_mixed"]),
-        "pmcl": ("P-MCL (single agent)", "-", COLORS["pmcl"]),
-        "mrd": ("MRD (analytical)", "--", COLORS["mrd"]),
+        "well_mixed": ("Bầy đàn (weighted voter)", "-", COLORS["well_mixed"]),
+        "pmcl": ("P-MCL (tác tử đơn)", "-", COLORS["pmcl"]),
+        "mrd": ("MRD (rời rạc δ = 1)", "--", COLORS["mrd"]),
     }
     for key, (label, line_style, color) in styles.items():
         mean = curves[key].mean(axis=0)
@@ -49,8 +50,8 @@ def plot_reproduction(curves: dict[str, np.ndarray], out_dir: Path) -> list[Path
         if key != "mrd":
             ax.fill_between(t, mean - std, mean + std, color=color, alpha=0.18)
 
-    ax.set_xlabel("Decision step")
-    ax.set_ylabel("Share of best option")
+    ax.set_xlabel("Bước quyết định")
+    ax.set_ylabel("Tỉ lệ chọn phương án tốt nhất")
     ax.set_ylim(-0.02, 1.02)
     ax.set_xlim(0, steps - 1)
     ax.legend(frameon=False)
@@ -70,11 +71,34 @@ def config_summary(df: pd.DataFrame) -> pd.DataFrame:
                 "t90": group["t90"].median(),
                 "hit_rate": group["t90_hit"].mean(),
                 "final": group["final_best_mass"].median(),
+                "final95": (group["final_best_mass"] >= 0.95).mean(),
                 "consensus": group["consensus"].median(),
                 "degree_cv": group["degree_cv"].iloc[0],
             }
         )
-    return pd.DataFrame(rows)
+    summary = pd.DataFrame(rows)
+    # A rewiring probability too small to touch the lattice reproduces the
+    # same graph (identical tau and L). Keep one row per distinct topology
+    # so the fit and the figure do not count one configuration twice.
+    key = summary[["tau", "path_length"]].round(6).astype(str).agg("|".join, axis=1)
+    return summary.loc[~key.duplicated()].reset_index(drop=True)
+
+
+def fit_law(summary: pd.DataFrame) -> tuple[float, float, float, int]:
+    """Fit ``t90 = intercept + slope * L`` on non-intervention families.
+
+    The two-room graphs are the held-out intervention, so they are excluded
+    from the calibration. Returns ``(intercept, slope, r2, n_train)``.
+    """
+    train = summary[summary["family"] != "two_room"]
+    x = train["path_length"].to_numpy(float)
+    y = train["t90"].to_numpy(float)
+    if x.size < 3:
+        return float("nan"), float("nan"), float("nan"), int(x.size)
+    slope, intercept = np.polyfit(x, y, 1)
+    predicted = intercept + slope * x
+    r2 = 1.0 - np.sum((y - predicted) ** 2) / np.sum((y - y.mean()) ** 2)
+    return float(intercept), float(slope), float(r2), int(x.size)
 
 
 def plot_law(df: pd.DataFrame, out_dir: Path) -> list[Path]:
@@ -84,13 +108,14 @@ def plot_law(df: pd.DataFrame, out_dir: Path) -> list[Path]:
 
     fig, axes = plt.subplots(1, 2, figsize=(11.0, 4.2))
 
+    labels = {"ws": "WS", "rgg": "RGG", "two_room": "Hai buồng (kiểm định)"}
     ax = axes[0]
-    for family in ("ws", "rgg"):
+    for family in ("ws", "rgg", "two_room"):
         sub = measured[measured["family"] == family]
         if sub.empty:
             continue
         ax.scatter(
-            sub["tau"], sub["t90"], s=40, color=COLORS[family], label=family.upper()
+            sub["tau"], sub["t90"], s=40, color=COLORS[family], label=labels[family]
         )
         if len(sub) >= 3:
             slope, intercept = np.polyfit(
@@ -109,18 +134,18 @@ def plot_law(df: pd.DataFrame, out_dir: Path) -> list[Path]:
             s=40,
             facecolors="none",
             edgecolors="0.4",
-            label="censored (<50% of seeds)",
+            label="bị censor (<50% seed)",
         )
     ax.set_xscale("log")
     ax.set_ylim(0, None)
-    ax.set_xlabel(r"Graph relaxation time  $\tau = 1/(1-\lambda_2)$")
-    ax.set_ylabel("Steps to reach 90% on the best option")
-    ax.set_title("(a) Relaxation time: two separate trends")
+    ax.set_xlabel(r"Thời gian relaxation  $\tau = 1/(1-\lambda_2)$")
+    ax.set_ylabel("Số bước đạt 90% phương án tốt nhất")
+    ax.set_title("(a) Thời gian relaxation: hai xu hướng tách nhau")
     ax.legend(frameon=False, fontsize=8)
     ax.grid(alpha=0.3, which="both")
 
     ax = axes[1]
-    for family in ("ws", "rgg"):
+    for family in ("ws", "rgg", "two_room"):
         sub = measured[measured["family"] == family]
         if sub.empty:
             continue
@@ -129,27 +154,25 @@ def plot_law(df: pd.DataFrame, out_dir: Path) -> list[Path]:
             sub["t90"],
             s=40,
             color=COLORS[family],
-            label=family.upper(),
+            label=labels[family],
         )
-    x = measured["path_length"].to_numpy(float)
-    y = measured["t90"].to_numpy(float)
-    if x.size >= 3:
-        slope, intercept = np.polyfit(x, y, 1)
-        predicted = intercept + slope * x
-        r2 = 1.0 - np.sum((y - predicted) ** 2) / np.sum((y - y.mean()) ** 2)
-        xs = np.linspace(0.0, x.max() * 1.05, 50)
+    # Calibrate on the non-intervention configurations and keep the two-room
+    # graphs as a held-out check, so the line is not fitted to its test points.
+    intercept, slope, r2, n_train = fit_law(measured)
+    if n_train >= 3:
+        xs = np.linspace(0.0, measured["path_length"].max() * 1.05, 50)
         ax.plot(xs, intercept + slope * xs, color="0.2", linewidth=1.2)
         ax.annotate(
-            " $t_{90}$ = %.1f + %.2f $\\cdot$ L\n $R^2$ = %.2f"
-            % (intercept, slope, r2),
+            " $t_{90}$ = %.2f + %.2f $\\cdot$ L\n $R^2$ = %.2f  (fit %d cấu hình)"
+            % (intercept, slope, r2, n_train),
             xy=(0.04, 0.80),
             xycoords="axes fraction",
             fontsize=10,
         )
     ax.set_ylim(0, None)
-    ax.set_xlabel(r"Average shortest-path length  $L$")
-    ax.set_ylabel("Steps to reach 90% on the best option")
-    ax.set_title("(b) Path length predicts both families")
+    ax.set_xlabel(r"Đường đi trung bình  $L$")
+    ax.set_ylabel("Số bước đạt 90% phương án tốt nhất")
+    ax.set_title("(b) Đường đi trung bình dự báo cả hai họ")
     ax.legend(frameon=False, fontsize=8)
     ax.grid(alpha=0.3)
 
@@ -162,11 +185,12 @@ def plot_trajectories(
 ) -> list[Path]:
     fig, ax = plt.subplots(figsize=(7.0, 4.4))
     keys = [
-        ("complete:1", "complete graph", "0.15", "-"),
+        ("complete:1", "Đồ thị đầy đủ", "0.15", "-"),
         ("ws:1", r"WS $p=1$", "#1f77b4", "-"),
-        ("ws:0.1", r"WS $p=0.1$", "#ff7f0e", "-"),
-        ("ws:0.05", r"WS $p=0.05$", "#9467bd", "-"),
-        ("ws:0.01", r"WS $p=0.01$", "#d62728", "-"),
+        ("ws:0.1", r"WS $p=0{,}1$", "#ff7f0e", "-"),
+        ("ws:0.05", r"WS $p=0{,}05$", "#9467bd", "-"),
+        ("ws:0.01", r"WS $p=0{,}01$", "#d62728", "-"),
+        ("ws:0", r"WS $p=0$ (vòng lattice)", "#8c564b", "-"),
     ]
     for key, label, color, style in keys:
         lookup = key if key in mean_curves else key.replace(":", "_")
@@ -182,10 +206,10 @@ def plot_trajectories(
         "--",
         color=COLORS["mrd"],
         linewidth=1.4,
-        label="MRD (well-mixed theory)",
+        label="MRD (lý thuyết trộn đều)",
     )
-    ax.set_xlabel("Decision step")
-    ax.set_ylabel("Share of best option")
+    ax.set_xlabel("Bước quyết định")
+    ax.set_ylabel("Tỉ lệ chọn phương án tốt nhất")
     ax.set_ylim(-0.02, 1.02)
     ax.legend(frameon=False, fontsize=8)
     ax.grid(alpha=0.3)

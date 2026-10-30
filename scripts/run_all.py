@@ -9,18 +9,21 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import sys
 import time
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+
 from hive.bandit import make_q
 from hive.graph_sweep import WS_P, reference_mrd, run_graph_sweep
 from hive.plots import config_summary, plot_law, plot_reproduction, plot_trajectories
 from hive.reproduce import run_reproduction
 
-ROOT = Path(__file__).resolve().parents[1]
 RESULTS = ROOT / "results"
 FIGURES = ROOT / "figures"
 

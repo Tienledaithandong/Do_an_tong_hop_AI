@@ -19,6 +19,7 @@ from reportlab.lib.units import cm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import (
+    CondPageBreak,
     Image,
     KeepTogether,
     Paragraph,
@@ -91,6 +92,10 @@ def build_styles() -> dict[str, ParagraphStyle]:
         "h2": ParagraphStyle(
             "h2", fontName=f"{FAMILY}-Bold", fontSize=11.5, leading=16,
             spaceBefore=12, spaceAfter=4,
+        ),
+        "h3": ParagraphStyle(
+            "h3", fontName=f"{FAMILY}-Bold", fontSize=10.8, leading=15,
+            spaceBefore=8, spaceAfter=3,
         ),
         "body": ParagraphStyle(
             "body", fontName=FAMILY, fontSize=10.2, leading=15.2,
@@ -217,6 +222,23 @@ def parse_blocks(lines: list[str]):
         yield ("p", " ".join(paragraph))
 
 
+def table_widths(n_cols: int, page_width: float) -> list[float]:
+    """Column widths in points, scaled to the text width.
+
+    Seven columns is the original configuration table; eight columns is the
+    version that adds the ``seed final >= 0.95`` column. Both need explicit
+    widths so the header does not wrap into an unreadable stack.
+    """
+    if n_cols == 7:
+        base = [2.0, 2.4, 2.2, 2.0, 1.9, 3.2, 1.9]
+    elif n_cols == 8:
+        base = [1.7, 2.3, 1.4, 1.4, 1.6, 2.7, 1.8, 3.0]
+    else:
+        return [page_width / n_cols] * n_cols
+    scale = page_width / (sum(base) * cm)
+    return [width * cm * scale for width in base]
+
+
 def build() -> Path:
     register_fonts()
     styles = build_styles()
@@ -228,11 +250,7 @@ def build() -> Path:
             [Paragraph(inline(cell), styles["cell"]) for cell in row]
             for row in rows
         ]
-        n_cols = len(rows[0])
-        if n_cols == 7:
-            widths = [2.0 * cm, 2.4 * cm, 2.2 * cm, 2.0 * cm, 1.9 * cm, 3.2 * cm, 1.9 * cm]
-        else:
-            widths = [page_width / n_cols] * n_cols
+        widths = table_widths(len(rows[0]), page_width)
         table = Table(data, colWidths=widths, repeatRows=1, hAlign="LEFT")
         table.setStyle(
             TableStyle(
@@ -257,7 +275,7 @@ def build() -> Path:
         elif kind == "h1":
             story.append(Paragraph(inline(block[1]), styles["h1"]))
         elif kind == "h3":
-            story.append(Paragraph(inline(block[1]), styles["body"]))
+            story.append(Paragraph(inline(block[1]), styles["h3"]))
         elif kind == "p":
             story.append(Paragraph(inline(block[1]), styles["body"]))
         elif kind == "code":
@@ -277,6 +295,19 @@ def build() -> Path:
                 )
             story.append(Spacer(1, 4))
         elif kind == "table":
+            # A long table that starts near the bottom of a page leaves only
+            # a couple of rows before the break. Push it to a fresh page when
+            # there is not enough room for a meaningful first chunk, and take
+            # the caption with it so the two are not separated.
+            if len(block[1]) > 10:
+                caption = None
+                if story and isinstance(story[-1], Paragraph):
+                    text = re.sub(r"<[^>]+>", "", story[-1].text).strip()
+                    if text.startswith("Bảng"):
+                        caption = story.pop()
+                story.append(CondPageBreak(9 * cm))
+                if caption is not None:
+                    story.append(caption)
             story.append(Spacer(1, 3))
             story.append(make_table(block[1]))
             story.append(Spacer(1, 9))

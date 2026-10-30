@@ -22,6 +22,21 @@ def test_cycle_relaxation_scales_quadratically():
     assert 0.5 * n**2 / (2 * np.pi**2) < tau < 1.5 * n**2 / (2 * np.pi**2)
 
 
+def test_large_cycle_uses_the_algebraic_spectral_branch():
+    # The sparse branch used to ask for the largest-magnitude eigenvalue and
+    # therefore returned lambda2 = -1 (tau = 0.5) for bipartite graphs.
+    n = 600
+    _, tau = relaxation_time(ws_graph(n, 2, 0.0, seed=0))
+    assert 0.5 * n**2 / (2 * np.pi**2) < tau < 1.5 * n**2 / (2 * np.pi**2)
+
+
+def test_two_node_graph_has_a_finite_relaxation_time():
+    adj = sparse.csr_matrix([[0.0, 1.0], [1.0, 0.0]])
+    lambda2, tau = relaxation_time(adj)
+    assert lambda2 == pytest.approx(-1.0)
+    assert tau == pytest.approx(0.5)
+
+
 def test_ws_with_zero_rewiring_is_a_cycle():
     adj = ws_graph(20, 2, 0.0, seed=1)
     assert adj.nnz == 40
