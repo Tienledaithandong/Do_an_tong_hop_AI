@@ -50,3 +50,15 @@ HEAVY_TAIL: dict = {
     "intercept": 44.85,
     "slope": 3.46,
 }
+
+# Source-room intervention: the best option starts in room A only, so the
+# bridge is the sole channel for it to reach room B. This is deliberately
+# different from the original sweep, where both rooms were already seeded.
+TWO_ROOM_SOURCE: dict = {
+    "N": 300,
+    "steps": 600,
+    "seeds": 30,
+    "n_types": 10,
+    "scenario": "middle",
+    "bridges": [1, 3, 6, 12],
+}

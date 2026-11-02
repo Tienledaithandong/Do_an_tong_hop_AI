@@ -8,6 +8,8 @@ on the best option.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import numpy as np
 import pandas as pd
 from scipy import sparse
@@ -21,7 +23,7 @@ from .graphs import (
     two_room_graph,
     ws_graph,
 )
-from .metrics import best_mass, consensus, l2_to_reference, t90
+from .metrics import best_mass, consensus, l2_to_reference, t90, threshold_time
 from .models import mrd_step
 from .swarm import graph_voter, well_mixed_voter
 
@@ -33,6 +35,45 @@ def _initial_types(rng: np.random.Generator, n: int, N: int) -> np.ndarray:
     if types.size < N:
         types = np.concatenate([types, rng.integers(0, n, N - types.size)])
     rng.shuffle(types)
+    return types
+
+
+def room_mask(N: int, room: int = 0) -> np.ndarray:
+    """Boolean mask for one of the two rooms in ``two_room_graph``."""
+    half = N // 2
+    mask = np.arange(N) < half
+    return mask if room == 0 else ~mask
+
+
+def initial_types_source_room(
+    rng: np.random.Generator,
+    n: int,
+    N: int,
+    best: int,
+    source_mask: np.ndarray,
+) -> np.ndarray:
+    """Balanced types with the optimal type confined to the source room.
+
+    This is the intervention the original two-room experiment was missing:
+    the target room starts with *no* copy of the best option, so the bridge
+    is the only channel through which it can arrive.
+    """
+    target_mask = ~source_mask
+    source_idx = np.flatnonzero(source_mask)
+    target_idx = np.flatnonzero(target_mask)
+
+    source_types = np.arange(source_idx.size) % n
+    if best not in source_types:
+        source_types[0] = best
+    rng.shuffle(source_types)
+
+    others = np.array([a for a in range(n) if a != best], dtype=int)
+    target_types = others[np.arange(target_idx.size) % others.size]
+    rng.shuffle(target_types)
+
+    types = np.empty(N, dtype=int)
+    types[source_idx] = source_types
+    types[target_idx] = target_types
     return types
 
 
@@ -56,8 +97,16 @@ def simulate_on_graph(
     delta: float = 0.1,
     n_types: int | None = None,
     mode: str = "graph",
+    progress: Callable[[int, int], None] | None = None,
+    return_state: bool = False,
 ) -> dict[str, np.ndarray]:
-    """Run the weighted voter on a fixed topology and summarise every seed."""
+    """Run the weighted voter on a fixed topology and summarise every seed.
+
+    ``progress`` is called as ``progress(completed_seeds, total_seeds)`` after
+    each seed, which lets a UI report progress without changing the numerics.
+    ``return_state`` adds the final type vector of the last seed under
+    ``"final_types"``, used for visualisation only.
+    """
     q = np.asarray(q, dtype=float)
     n = int(q.size) if n_types is None else n_types
     best = int(np.argmax(q))
@@ -92,8 +141,10 @@ def simulate_on_graph(
         counts = np.bincount(types, minlength=n) / N
         consensuses[seed] = consensus(counts)
         l2s[seed] = l2_to_reference(curve, mrd_curve)
+        if progress is not None:
+            progress(seed + 1, seeds)
 
-    return {
+    result: dict[str, np.ndarray] = {
         "curves": curves,
         "t90": t90s,
         "hit": hits,
@@ -102,6 +153,105 @@ def simulate_on_graph(
         "l2_mrd": l2s,
         "mrd": mrd_curve,
     }
+    if return_state and seeds > 0:
+        result["final_types"] = types.copy()
+    return result
+
+
+def simulate_two_room_source(
+    adj: sparse.spmatrix,
+    q: np.ndarray,
+    steps: int = 600,
+    seeds: int = 30,
+    delta: float = 0.1,
+    n_types: int | None = None,
+    source_room: int = 0,
+    progress: Callable[[int, int], None] | None = None,
+    return_state: bool = False,
+) -> dict[str, np.ndarray]:
+    """Two-room intervention with the optimal type seeded in one room only.
+
+    Both rooms in ``two_room_graph`` are cliques. With the usual balanced
+    initial condition each room already contains the best type, so the bridge
+    is irrelevant. Here the target room starts with only non-optimal types;
+    ``t50_target`` and ``t90_target`` therefore measure how long information
+    needs to cross the bridge, which is the quantity the original experiment
+    claimed to isolate.
+    """
+    q = np.asarray(q, dtype=float)
+    n = int(q.size) if n_types is None else n_types
+    best = int(np.argmax(q))
+    N = adj.shape[0]
+    source_mask = room_mask(N, source_room)
+    target_mask = ~source_mask
+    mrd_curve = reference_mrd(q, steps)
+
+    n_curves = ("curves", "source_curves", "target_curves")
+    curves = {name: np.zeros((seeds, steps + 1)) for name in n_curves}
+    arrays = {
+        "t10_target": np.zeros(seeds),
+        "t50_target": np.zeros(seeds),
+        "t90_target": np.zeros(seeds),
+        "t90": np.zeros(seeds),
+        "final": np.zeros(seeds),
+        "final_target": np.zeros(seeds),
+        "consensus": np.zeros(seeds),
+        "l2_mrd": np.zeros(seeds),
+    }
+    flags = {
+        "hit10_target": np.zeros(seeds, dtype=bool),
+        "hit50_target": np.zeros(seeds, dtype=bool),
+        "hit90_target": np.zeros(seeds, dtype=bool),
+        "hit": np.zeros(seeds, dtype=bool),
+    }
+    tail = max(1, steps // 10)
+
+    for seed in range(seeds):
+        rng = np.random.default_rng(seed)
+        bandit = Bandit(q, delta=delta, rng=rng)
+        types = initial_types_source_room(rng, n, N, best, source_mask)
+        overall = curves["curves"][seed]
+        source_curve = curves["source_curves"][seed]
+        target_curve = curves["target_curves"][seed]
+        overall[0] = best_mass(types, best)
+        source_curve[0] = best_mass(types[source_mask], best)
+        target_curve[0] = best_mass(types[target_mask], best)
+
+        for step in range(steps):
+            rewards = bandit.pull(types)
+            types = graph_voter(types, rewards, adj, rng, n_types=n)
+            overall[step + 1] = best_mass(types, best)
+            source_curve[step + 1] = best_mass(types[source_mask], best)
+            target_curve[step + 1] = best_mass(types[target_mask], best)
+
+        for key, threshold, prefix in (
+            ("t10_target", 0.10, "hit10_target"),
+            ("t50_target", 0.50, "hit50_target"),
+            ("t90_target", 0.90, "hit90_target"),
+        ):
+            arrays[key][seed], flags[prefix][seed] = threshold_time(
+                target_curve, threshold=threshold
+            )
+        arrays["t90"][seed], flags["hit"][seed] = t90(overall)
+        arrays["final"][seed] = float(overall[-tail:].mean())
+        arrays["final_target"][seed] = float(target_curve[-tail:].mean())
+        counts = np.bincount(types, minlength=n) / N
+        arrays["consensus"][seed] = consensus(counts)
+        arrays["l2_mrd"][seed] = l2_to_reference(overall, mrd_curve)
+        if progress is not None:
+            progress(seed + 1, seeds)
+
+    result: dict[str, np.ndarray] = {
+        **curves,
+        **arrays,
+        **flags,
+        "mrd": mrd_curve,
+        "source_mask": source_mask,
+        "target_mask": target_mask,
+    }
+    if return_state and seeds > 0:
+        result["final_types"] = types.copy()
+    return result
 
 
 def run_graph_sweep(

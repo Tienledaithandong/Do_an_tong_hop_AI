@@ -73,7 +73,9 @@ def config_summary(df: pd.DataFrame) -> pd.DataFrame:
                 "final": group["final_best_mass"].median(),
                 "final95": (group["final_best_mass"] >= 0.95).mean(),
                 "consensus": group["consensus"].median(),
+                "degree_mean": group["degree_mean"].iloc[0],
                 "degree_cv": group["degree_cv"].iloc[0],
+                "connected": bool(np.isfinite(group["tau"].iloc[0])),
             }
         )
     summary = pd.DataFrame(rows)
@@ -87,10 +89,23 @@ def config_summary(df: pd.DataFrame) -> pd.DataFrame:
 def fit_law(summary: pd.DataFrame) -> tuple[float, float, float, int]:
     """Fit ``t90 = intercept + slope * L`` on non-intervention families.
 
-    The two-room graphs are the held-out intervention, so they are excluded
-    from the calibration. Returns ``(intercept, slope, r2, n_train)``.
+    Two-room graphs are the held-out intervention. Disconnected graphs and
+    configurations whose ``t90`` is censored in more than half of the seeds
+    are excluded when the corresponding columns are present; otherwise the
+    fit would mix a mixing-time proxy with a travel-time proxy.
+    Returns ``(intercept, slope, r2, n_train)``.
     """
     train = summary[summary["family"] != "two_room"]
+    if "connected" in train:
+        train = train[train["connected"].astype(bool)]
+    if "tau" in train:
+        train = train[np.isfinite(pd.to_numeric(train["tau"], errors="coerce"))]
+    if "hit_rate" in train:
+        train = train[train["hit_rate"] >= 0.5]
+    train = train[
+        np.isfinite(pd.to_numeric(train["path_length"], errors="coerce"))
+        & np.isfinite(pd.to_numeric(train["t90"], errors="coerce"))
+    ]
     x = train["path_length"].to_numpy(float)
     y = train["t90"].to_numpy(float)
     if x.size < 3:
@@ -214,3 +229,80 @@ def plot_trajectories(
     ax.legend(frameon=False, fontsize=8)
     ax.grid(alpha=0.3)
     return _save(fig, out_dir, "fig3_trajectories")
+
+
+def _median_ci(values: np.ndarray, n_boot: int = 800, seed: int = 0) -> tuple[float, float, float]:
+    values = np.asarray(values, dtype=float)
+    values = values[np.isfinite(values)]
+    if values.size == 0:
+        return float("nan"), float("nan"), float("nan")
+    median = float(np.median(values))
+    rng = np.random.default_rng(seed)
+    draws = rng.choice(values, size=(n_boot, values.size), replace=True)
+    boots = np.median(draws, axis=1)
+    return median, float(np.percentile(boots, 2.5)), float(np.percentile(boots, 97.5))
+
+
+def plot_two_room_source(
+    per_seed: pd.DataFrame,
+    curves: dict[int, np.ndarray],
+    out_dir: Path,
+) -> list[Path]:
+    """Target-room arrival times when only the source room is seeded."""
+    bridges = sorted(curves)
+    colors = plt.cm.viridis(np.linspace(0.15, 0.85, len(bridges)))
+    fig, axes = plt.subplots(1, 2, figsize=(11.0, 4.2))
+
+    ax = axes[0]
+    for color, bridge in zip(colors, bridges):
+        curve = np.asarray(curves[bridge], dtype=float)
+        ax.plot(
+            np.arange(curve.size),
+            curve,
+            color=color,
+            linewidth=1.8,
+            label=f"cầu = {bridge}",
+        )
+    ax.set_xlabel("Bước quyết định")
+    ax.set_ylabel("Tỉ lệ phương án tốt trong buồng đích")
+    ax.set_ylim(-0.02, 1.02)
+    ax.set_title("(a) Lan truyền sang buồng đích")
+    ax.legend(frameon=False, fontsize=8)
+    ax.grid(alpha=0.3)
+
+    ax = axes[1]
+    for offset, metric, marker, color in (
+        (-0.12, "t50_target", "o", "#0e7c86"),
+        (0.12, "t90_target", "s", "#d97706"),
+    ):
+        hit_column = "hit50_target" if metric == "t50_target" else "hit90_target"
+        xs: list[float] = []
+        medians: list[float] = []
+        lower: list[float] = []
+        upper: list[float] = []
+        for bridge in bridges:
+            mask = (per_seed["bridge"] == bridge) & per_seed[hit_column]
+            values = per_seed.loc[mask, metric].to_numpy(float)
+            median, lo, hi = _median_ci(values)
+            xs.append(bridge + offset)
+            medians.append(median)
+            lower.append(median - lo)
+            upper.append(hi - median)
+        ax.errorbar(
+            xs,
+            medians,
+            yerr=np.vstack([lower, upper]),
+            fmt=marker,
+            color=color,
+            capsize=3,
+            linewidth=1.2,
+            label="50% buồng đích" if metric == "t50_target" else "90% buồng đích",
+        )
+    ax.set_xlabel("Số cạnh cầu nối hai buồng")
+    ax.set_ylabel("Số bước (trung vị, CI 95%)")
+    ax.set_title("(b) Thời gian qua cầu")
+    ax.legend(frameon=False, fontsize=8)
+    ax.grid(alpha=0.3)
+
+    fig.tight_layout()
+    return _save(fig, out_dir, "fig4_two_room_source")

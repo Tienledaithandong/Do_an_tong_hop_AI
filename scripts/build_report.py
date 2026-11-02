@@ -110,6 +110,11 @@ def build_styles() -> dict[str, ParagraphStyle]:
             leftIndent=12, backColor=colors.HexColor("#f2f2f2"),
             borderPadding=5, spaceBefore=4, spaceAfter=8,
         ),
+        "formula": ParagraphStyle(
+            "formula", fontName=FAMILY, fontSize=9.8, leading=13.6,
+            leftIndent=12, backColor=colors.HexColor("#f2f2f2"),
+            borderPadding=5, spaceBefore=4, spaceAfter=8,
+        ),
         "caption": ParagraphStyle(
             "caption", fontName=f"{FAMILY}-Italic", fontSize=8.8, leading=12,
             alignment=TA_CENTER, spaceBefore=4, spaceAfter=10,
@@ -119,12 +124,22 @@ def build_styles() -> dict[str, ParagraphStyle]:
     }
 
 
+SUBSCRIPT_DIGITS = set("₀₁₂₃₄₅₆₇₈₉")
+
+
 def inline(text: str) -> str:
     text = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     text = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", text)
     text = re.sub(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)", r"<i>\1</i>", text)
-    text = re.sub(r"`(.+?)`", r'<font name="Mono" size="9">\1</font>', text)
-    return text
+
+    def code_span(match: re.Match[str]) -> str:
+        body = match.group(1)
+        # DejaVu Mono lacks subscript digits; keep the body font for those.
+        if any(char in SUBSCRIPT_DIGITS for char in body):
+            return f'<font name="{FAMILY}">{body}</font>'
+        return f'<font name="Mono" size="9">{body}</font>'
+
+    return re.sub(r"`(.+?)`", code_span, text)
 
 
 def parse_blocks(lines: list[str]):
@@ -281,7 +296,12 @@ def build() -> Path:
         elif kind == "code":
             body = block[1].replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
             body = body.replace("\n", "<br/>").replace(" ", "&nbsp;")
-            story.append(Paragraph(body, styles["code"]))
+            style = (
+                styles["formula"]
+                if any(char in SUBSCRIPT_DIGITS for char in block[1])
+                else styles["code"]
+            )
+            story.append(Paragraph(body, style))
         elif kind == "ul":
             for item in block[1]:
                 story.append(
@@ -359,4 +379,4 @@ def build() -> Path:
 
 
 if __name__ == "__main__":
-    print("wrote", build())
+    print("wrote", build().relative_to(ROOT))

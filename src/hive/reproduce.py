@@ -7,6 +7,8 @@ Maynard-Smith replicator dynamics used as the analytical reference.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import numpy as np
 
 from .bandit import Bandit, make_q
@@ -23,8 +25,13 @@ def run_reproduction(
     scenario: str = "middle",
     delta: float = 0.1,
     B: int | None = None,
+    progress: Callable[[int, int], None] | None = None,
 ) -> dict[str, np.ndarray]:
-    """Run the well-mixed comparison and return curves of shape (seeds, steps+1)."""
+    """Run the well-mixed comparison and return curves of shape (seeds, steps+1).
+
+    ``progress`` is called as ``progress(completed_seeds, total_seeds)`` after
+    each seed so a UI can show a progress bar.
+    """
     q = make_q(scenario, n)
     best = int(np.argmax(q))
     batch = N if B is None else B
@@ -60,5 +67,8 @@ def run_reproduction(
 
             pi_mrd = mrd_step(pi_mrd, q)
             curves["mrd"][seed, step + 1] = pi_mrd[best]
+
+        if progress is not None:
+            progress(seed + 1, seeds)
 
     return curves

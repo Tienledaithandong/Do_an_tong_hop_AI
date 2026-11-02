@@ -24,7 +24,7 @@ def _smooth(curve: np.ndarray, window: int) -> np.ndarray:
     return np.convolve(padded, kernel, mode="valid")
 
 
-def t90(
+def threshold_time(
     curve: np.ndarray, threshold: float = 0.9, window: int = 5
 ) -> tuple[float, bool]:
     """First step where the smoothed curve reaches ``threshold``.
@@ -41,6 +41,13 @@ def t90(
     if hits.size == 0:
         return float(curve.size), False
     return float(hits[0]), True
+
+
+def t90(
+    curve: np.ndarray, threshold: float = 0.9, window: int = 5
+) -> tuple[float, bool]:
+    """First step where the smoothed curve reaches 90% of the best option."""
+    return threshold_time(curve, threshold=threshold, window=window)
 
 
 def consensus(pi: np.ndarray) -> float:

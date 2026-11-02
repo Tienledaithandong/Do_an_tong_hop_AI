@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>HiveMindRL · Bầy đàn học trên đồ thị</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div class="app-shell">
+
+  <aside class="sidebar">
+    <a class="brand" href="#overview" data-jump="overview" aria-label="HiveMindRL — tổng quan">
+      <svg class="brand-mark" viewBox="0 0 40 44" aria-hidden="true">
+        <path d="M20 1.5 37 11v20L20 40 3 31V11Z" fill="none" stroke="currentColor" stroke-width="2.2"/>
+        <circle cx="20" cy="21" r="4" fill="currentColor"/>
+        <circle cx="13" cy="13" r="2.2" fill="currentColor" opacity=".65"/>
+        <circle cx="27" cy="13" r="2.2" fill="currentColor" opacity=".65"/>
+        <circle cx="13" cy="29" r="2.2" fill="currentColor" opacity=".65"/>
+        <circle cx="27" cy="29" r="2.2" fill="currentColor" opacity=".65"/>
+      </svg>
+      <span class="brand-copy">
+        <strong>HiveMindRL</strong>
+        <span>Bầy đàn trên đồ thị</span>
+      </span>
+    </a>
+
+    <nav class="nav" id="tabs" role="tablist" aria-label="Khu vực làm việc">
+      <span class="nav-label">Không gian làm việc</span>
+      <button class="tab is-active" role="tab" aria-selected="true" data-tab="overview" data-title="Tổng quan">Tổng quan</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="reproduce" data-title="Tái tạo">Tái tạo</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="graph" data-title="Đồ thị đơn">Đồ thị đơn</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="compare" data-title="So sánh">So sánh</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="stored" data-title="Kết quả lưu">Kết quả lưu</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="tests" data-title="Kiểm thử">Kiểm thử</button>
+    </nav>
+
+    <div class="sidebar-foot">
+      <div class="server" id="server-status" title="Trạng thái máy chủ cục bộ">
+        <span class="dot"></span><span class="server-text">đang kết nối</span>
+      </div>
+      <a class="side-link" href="/report.pdf" target="_blank" rel="noopener">Báo cáo PDF ↗</a>
+    </div>
+  </aside>
+
+  <div class="workspace">
+    <header class="topbar">
+      <div class="crumbs">
+        <span>HiveMindRL</span>
+        <span class="sep">/</span>
+        <strong id="page-title">Tổng quan</strong>
+      </div>
+      <div class="top-actions">
+        <span class="pill" id="test-count-badge">pytest sẵn sàng</span>
+        <span class="pill pill-muted">NumPy · seed cố định</span>
+      </div>
+    </header>
+
+    <main class="main">
+
+      <!-- ============================================================ overview -->
+      <section class="panel is-active" id="panel-overview" role="tabpanel" aria-label="Tổng quan">
+        <div class="page-head">
+          <div>
+            <span class="eyebrow">Đồ án tổng hợp · Trí tuệ nhân tạo</span>
+            <h1>Bầy đàn học như một tác tử</h1>
+            <p class="lede">Tái tạo kết quả well-mixed của Soma et al. (2026), rồi đặt bầy weighted-voter lên đồ thị để xem cấu trúc làm chậm việc học ra sao.</p>
+          </div>
+          <div class="page-actions">
+            <a class="btn btn-primary" href="#reproduce" data-jump="reproduce">Chạy tái tạo</a>
+            <a class="btn" href="#compare" data-jump="compare">So sánh topology</a>
+          </div>
+        </div>
+
+        <div class="kpi-grid">
+          <article class="kpi">
+            <span>Tái tạo</span>
+            <strong>0,018</strong>
+            <small>sai lệch tối đa P-MCL vs MRD</small>
+          </article>
+          <article class="kpi">
+            <span>Khảo sát</span>
+            <strong>22</strong>
+            <small>cấu hình × 100 seed</small>
+          </article>
+          <article class="kpi">
+            <span>τ mất tương quan</span>
+            <strong>0,69 <i>→</i> 0,10</strong>
+            <small>Spearman(t₉₀, τ) khi thêm hai buồng</small>
+          </article>
+          <article class="kpi kpi-accent">
+            <span>L thay thế</span>
+            <strong>0,82 <i>→</i> 0,89</strong>
+            <small>Spearman(t₉₀, L) trên cùng hai tập</small>
+          </article>
+        </div>
+
+        <div class="grid-2">
+          <article class="card findings-card">
+            <div class="card-head">
+              <div><span class="card-kicker">Kết luận</span><h2>Ba phát hiện</h2></div>
+            </div>
+            <div class="finding-list">
+              <div class="finding">
+                <span class="finding-no">01</span>
+                <div><strong>Ba learner, một đường học</strong><p>Bầy đàn và P-MCL bám MRD; lệch tối đa 0,018 sau bước 10.</p></div>
+              </div>
+              <div class="finding">
+                <span class="finding-no">02</span>
+                <div><strong>τ không phổ quát</strong><p>Cùng τ ≈ 100: RGG cần khoảng 60 bước, WS cần khoảng 90 bước.</p></div>
+              </div>
+              <div class="finding">
+                <span class="finding-no">03</span>
+                <div><strong>L dự báo được cả hai họ</strong><p>Một đường thẳng theo L mô tả WS lẫn RGG; hai buồng là điểm held-out.</p></div>
+              </div>
+            </div>
+            <p class="card-note">Mệnh đề 2 của bài báo chỉ đòi hỏi trộn đều; đồ án kiểm tra điều kiện đó khi mỗi cá thể chỉ còn hàng xóm.</p>
+          </article>
+
+          <article class="card law-card">
+            <div class="card-head">
+              <div><span class="card-kicker">Độ tin cậy</span><h2>Quy luật t₉₀ ~ L</h2></div>
+              <span class="law-tag" id="law-tag">đang tải</span>
+            </div>
+            <div class="law-line" id="law-line">t₉₀ = 44,85 + 3,46 · L</div>
+            <div class="law-meta">
+              <div><span>R²</span><strong id="law-r2">0,910</strong></div>
+              <div><span>n huấn luyện</span><strong id="law-n">16</strong></div>
+              <div class="wide"><span>CI 95% của độ dốc</span><strong id="law-ci">3,04 – 6,67</strong></div>
+            </div>
+            <div class="law-warnings" id="law-warnings"></div>
+            <details>
+              <summary>Đọc kết quả này thế nào?</summary>
+              <p>L là mô tả hữu ích, không phải định luật phổ quát. Khoảng tin cậy rộng, một cấu hình WS có đòn bẩy cao, và bậc trung bình giải thích thêm phương sai. Xem <code>results/law_diagnostics.json</code>.</p>
+            </details>
+          </article>
+        </div>
+
+        <div class="start-grid">
+          <a class="start-card" href="#reproduce" data-jump="reproduce">
+            <span class="start-tag">Thí nghiệm A</span>
+            <strong>Tái tạo well-mixed</strong>
+            <p>So ba đường học trên cùng bandit.</p>
+            <span class="start-go">Mở →</span>
+          </a>
+          <a class="start-card" href="#graph" data-jump="graph">
+            <span class="start-tag">Thí nghiệm B</span>
+            <strong>Một đồ thị</strong>
+            <p>Chọn topology, xem τ, L và t₉₀.</p>
+            <span class="start-go">Mở →</span>
+          </a>
+          <a class="start-card" href="#compare" data-jump="compare">
+            <span class="start-tag">Khảo sát</span>
+            <strong>So sánh nhiều cấu hình</strong>
+            <p>Kiểm tra τ so với L trên một biểu đồ.</p>
+            <span class="start-go">Mở →</span>
+          </a>
+        </div>
+
+        <p class="foot-note">Mô phỏng chạy trực tiếp từ thư viện <code>hive</code>. Đầu ra đầy đủ nằm trong tab “Kết quả lưu” và báo cáo PDF.</p>
+      </section>
+
+      <!-- =========================================================== reproduce -->
+      <section class="panel" id="panel-reproduce" role="tabpanel" aria-label="Tái tạo">
+        <div class="page-head">
+          <div>
+            <span class="eyebrow">Thí nghiệm A</span>
+            <h1>Tái tạo well-mixed</h1>
+            <p class="lede">Ba learner xuất phát từ phân bố đều và gặp cùng bandit. Kỳ vọng: P-MCL và bầy đàn bám MRD.</p>
+          </div>
+          <div class="preset-group" data-target="rep" aria-label="Chọn nhanh">
+            <button class="chip" data-preset="quick">Nhanh</button>
+            <button class="chip" data-preset="medium">Vừa</button>
+            <button class="chip" data-preset="full">Đầy đủ</button>
+          </div>
+        </div>
+
+        <div class="workbench">
+          <form class="card form" id="rep-form" autocomplete="off">
+            <div class="form-head">
+              <span class="card-kicker">Tham số</span>
+              <span class="form-hint-inline">Ctrl + Enter để chạy</span>
+            </div>
+            <div class="form-grid">
+              <label class="field"><span>N (cá thể)</span><input type="number" name="N" min="20" max="800" step="10" value="300"></label>
+              <label class="field"><span>Bước</span><input type="number" name="steps" min="10" max="1000" step="10" value="120"></label>
+              <label class="field"><span>Seed</span><input type="number" name="seeds" min="1" max="200" step="1" value="10"></label>
+              <label class="field"><span>n (phương án)</span><input type="number" name="n" min="2" max="30" step="1" value="10"></label>
+              <label class="field field-wide"><span>Kịch bản q</span><select name="scenario" data-role="scenario"></select></label>
+              <label class="field"><span>Nhiễu Δ</span><input type="number" name="delta" min="0" max="0.5" step="0.01" value="0.1"></label>
+            </div>
+            <button class="btn btn-primary btn-block" type="submit" id="rep-run">Chạy mô phỏng</button>
+            <p class="form-error" id="rep-error" role="alert"></p>
+            <details class="form-details">
+              <summary>Cấu hình đầy đủ</summary>
+              <p>N=1000, 300 bước, 100 seed. B = N mẫu song song cho P-MCL.</p>
+            </details>
+          </form>
+
+          <div class="card result" id="rep-output">
+            <div class="result-head">
+              <div>
+                <span class="card-kicker">Kết quả</span>
+                <h3 id="rep-status">Chưa chạy</h3>
+              </div>
+              <span class="elapsed" id="rep-elapsed"></span>
+            </div>
+            <div class="progress" id="rep-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+              <span id="rep-bar"></span>
+            </div>
+            <div class="metric-grid" id="rep-metrics"></div>
+            <figure class="plot-wrap" id="rep-figure" hidden>
+              <img id="rep-plot" class="plot" alt="Đường học trung bình của bầy đàn, P-MCL và MRD">
+              <figcaption>Trung bình trên các seed; dải tô là ±1 độ lệch chuẩn. MRD là tham chiếu nét đứt.</figcaption>
+            </figure>
+            <div class="table-wrap" id="rep-table-wrap" hidden>
+              <table id="rep-table">
+                <thead><tr><th>Phương pháp</th><th class="num">Final best mass</th><th class="num">t₉₀</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <div class="verdict" id="rep-verdict" hidden></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =============================================================== graph -->
+      <section class="panel" id="panel-graph" role="tabpanel" aria-label="Đồ thị đơn">
+        <div class="page-head">
+          <div>
+            <span class="eyebrow">Thí nghiệm B</span>
+            <h1>Một đồ thị, một lần chạy</h1>
+            <p class="lede">Chọn topology và xem τ, L ảnh hưởng thế nào đến tốc độ hội tụ. Ảnh cấu trúc là trạng thái cuối của seed cuối.</p>
+          </div>
+          <div class="preset-group" data-target="graph" aria-label="Chọn nhanh">
+            <button class="chip" data-preset="quick">Nhanh</button>
+            <button class="chip" data-preset="medium">Vừa</button>
+            <button class="chip" data-preset="full">Đầy đủ</button>
+          </div>
+        </div>
+
+        <div class="workbench">
+          <form class="card form" id="graph-form" autocomplete="off">
+            <div class="form-head">
+              <span class="card-kicker">Tham số</span>
+              <span class="form-hint-inline">Ctrl + Enter để chạy</span>
+            </div>
+            <div class="form-grid">
+              <label class="field field-wide"><span>Họ đồ thị</span><select name="family" id="graph-family"></select></label>
+              <label class="field"><span id="graph-param-label">Tham số</span><input type="number" name="param" id="graph-param" step="0.1" value="0.1"></label>
+              <label class="field"><span>Chế độ</span>
+                <select name="mode">
+                  <option value="graph">Chỉ hàng xóm</option>
+                  <option value="well_mixed">Trộn đều</option>
+                </select>
+              </label>
+              <label class="field"><span>N (đỉnh)</span><input type="number" name="N" min="20" max="800" step="10" value="150"></label>
+              <label class="field"><span>Bước</span><input type="number" name="steps" min="10" max="1000" step="10" value="120"></label>
+              <label class="field"><span>Seed</span><input type="number" name="seeds" min="1" max="200" step="1" value="8"></label>
+              <label class="field"><span>n (phương án)</span><input type="number" name="n" min="2" max="30" step="1" value="10"></label>
+              <label class="field field-wide"><span>Kịch bản q</span><select name="scenario" data-role="scenario"></select></label>
+              <label class="field"><span>Nhiễu Δ</span><input type="number" name="delta" min="0" max="0.5" step="0.01" value="0.1"></label>
+            </div>
+            <p class="hint" id="family-hint"></p>
+            <button class="btn btn-primary btn-block" type="submit" id="graph-run">Chạy mô phỏng</button>
+            <p class="form-error" id="graph-error" role="alert"></p>
+          </form>
+
+          <div class="card result" id="graph-output">
+            <div class="result-head">
+              <div>
+                <span class="card-kicker">Kết quả</span>
+                <h3 id="graph-status">Chưa chạy</h3>
+              </div>
+              <span class="elapsed" id="graph-elapsed"></span>
+            </div>
+            <div class="progress" id="graph-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+              <span id="graph-bar"></span>
+            </div>
+            <div class="metric-grid" id="graph-metrics"></div>
+            <div class="plot-tabs" id="graph-plot-tabs" hidden>
+              <button class="plot-tab is-active" data-plot="curves">Đường học</button>
+              <button class="plot-tab" data-plot="graph">Cấu trúc cuối</button>
+            </div>
+            <figure class="plot-wrap" id="graph-figure" hidden>
+              <img id="graph-plot" class="plot" alt="Đường học trung bình trên đồ thị">
+              <figcaption id="graph-caption">Đường trung bình và dải ±1 độ lệch chuẩn; MRD là tham chiếu trộn đều.</figcaption>
+            </figure>
+            <div class="note-box" id="graph-note" hidden></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================= compare -->
+      <section class="panel" id="panel-compare" role="tabpanel" aria-label="So sánh">
+        <div class="page-head">
+          <div>
+            <span class="eyebrow">Khảo sát nhiều cấu hình</span>
+            <h1>So sánh topology</h1>
+            <p class="lede">Chạy cùng bandit và cùng số seed trên các cấu hình đã chọn, rồi so τ với L.</p>
+          </div>
+          <div class="preset-group" data-target="compare" aria-label="Chọn nhanh">
+            <button class="chip" data-preset="quick">Nhanh</button>
+            <button class="chip" data-preset="medium">Vừa</button>
+            <button class="chip" data-preset="full">Đầy đủ</button>
+          </div>
+        </div>
+
+        <div class="workbench">
+          <form class="card form" id="compare-form" autocomplete="off">
+            <div class="form-head">
+              <span class="card-kicker">Cấu hình</span>
+              <div class="config-actions">
+                <button type="button" class="text-btn" id="compare-all">Tất cả</button>
+                <button type="button" class="text-btn" id="compare-none">Bỏ chọn</button>
+              </div>
+            </div>
+            <div class="config-list" id="compare-configs"></div>
+            <div class="form-grid compact">
+              <label class="field"><span>N (đỉnh)</span><input type="number" name="N" min="20" max="800" step="10" value="120"></label>
+              <label class="field"><span>Bước</span><input type="number" name="steps" min="10" max="1000" step="10" value="120"></label>
+              <label class="field"><span>Seed</span><input type="number" name="seeds" min="1" max="200" step="1" value="6"></label>
+              <label class="field"><span>n (phương án)</span><input type="number" name="n" min="2" max="30" step="1" value="10"></label>
+              <label class="field field-wide"><span>Kịch bản q</span><select name="scenario" data-role="scenario"></select></label>
+              <label class="field"><span>Nhiễu Δ</span><input type="number" name="delta" min="0" max="0.5" step="0.01" value="0.1"></label>
+            </div>
+            <button class="btn btn-primary btn-block" type="submit" id="compare-run">Chạy so sánh</button>
+            <p class="form-error" id="compare-error" role="alert"></p>
+            <details class="form-details">
+              <summary>Mẹo chọn cấu hình</summary>
+              <p>Tối đa 14 cấu hình. Chọn cả WS, RGG và hai buồng để thấy τ tách khỏi L.</p>
+            </details>
+          </form>
+
+          <div class="card result" id="compare-output">
+            <div class="result-head">
+              <div>
+                <span class="card-kicker">Kết quả</span>
+                <h3 id="compare-status">Chưa chạy</h3>
+              </div>
+              <span class="elapsed" id="compare-elapsed"></span>
+            </div>
+            <div class="progress" id="compare-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+              <span id="compare-bar"></span>
+            </div>
+            <div class="fit-box" id="compare-fit" hidden></div>
+            <div class="law-warnings" id="compare-warnings" hidden></div>
+            <figure class="plot-wrap" id="compare-figure" hidden>
+              <img id="compare-plot" class="plot" alt="t90 theo tau và theo đường đi trung bình">
+              <figcaption>(a) t₉₀ theo τ (log); (b) t₉₀ theo L cùng đường hiệu chuẩn loại hai buồng. Điểm rỗng là cấu hình bị censor &gt;50% seed.</figcaption>
+            </figure>
+            <div class="table-wrap" id="compare-table-wrap" hidden>
+              <table id="compare-table">
+                <thead>
+                  <tr><th>Cấu hình</th><th class="num">τ</th><th class="num">L</th><th class="num">t₉₀</th><th class="num">Seed đạt</th><th class="num">≥ 0,95</th><th>Liên thông</th></tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <div class="note-box" id="compare-note" hidden></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================== stored -->
+      <section class="panel" id="panel-stored" role="tabpanel" aria-label="Kết quả lưu">
+        <div class="page-head">
+          <div>
+            <span class="eyebrow">Đầu ra pipeline</span>
+            <h1>Kết quả đã sinh</h1>
+            <p class="lede">Đọc trực tiếp CSV trong <code>results/</code> — đầu ra của <code>run_all.py</code> và <code>check_heavy_tail.py</code>.</p>
+          </div>
+          <a class="btn btn-ghost" href="/report.pdf" target="_blank" rel="noopener">Mở báo cáo PDF</a>
+        </div>
+
+        <div class="grid-2 stored-grid">
+          <div class="card">
+            <div class="card-head"><div><span class="card-kicker">Tệp có sẵn</span><h2>Results</h2></div></div>
+            <div class="file-list" id="stored-list"><p class="muted">Đang tải…</p></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><div><span class="card-kicker">Nội dung</span><h2>Xem trước</h2></div></div>
+            <div id="stored-view"><p class="muted">Chọn một tệp bên trái để xem 500 dòng đầu.</p></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =============================================================== tests -->
+      <section class="panel" id="panel-tests" role="tabpanel" aria-label="Kiểm thử">
+        <div class="page-head">
+          <div>
+            <span class="eyebrow">Chất lượng mã nguồn</span>
+            <h1>Chạy bộ kiểm thử</h1>
+            <p class="lede">Chạy <code>pytest -q</code> ngay trong tiến trình nền và xem kết quả tại đây.</p>
+          </div>
+          <button class="btn btn-primary" id="run-tests">Chạy pytest</button>
+        </div>
+
+        <div class="card tests-card">
+          <div class="result-head">
+            <div>
+              <span class="card-kicker">Trạng thái</span>
+              <h3 id="tests-status">Chưa chạy</h3>
+            </div>
+            <span class="elapsed" id="tests-elapsed"></span>
+          </div>
+          <div class="progress" id="tests-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <span id="tests-bar"></span>
+          </div>
+          <div id="tests-badge"></div>
+          <pre class="console" id="tests-output">Bấm “Chạy pytest” để bắt đầu.</pre>
+          <p class="form-error" id="tests-error" role="alert"></p>
+        </div>
+
+        <div class="test-files">
+          <span class="test-chip">test_bandit</span>
+          <span class="test-chip">test_models</span>
+          <span class="test-chip">test_swarm</span>
+          <span class="test-chip">test_graphs</span>
+          <span class="test-chip">test_metrics</span>
+          <span class="test-chip">test_analysis</span>
+          <span class="test-chip">test_two_room_source</span>
+          <span class="test-chip">test_webapp</span>
+        </div>
+      </section>
+
+    </main>
+
+    <footer class="footer">
+      <span>HiveMindRL · giao diện cục bộ trên 127.0.0.1</span>
+      <span>Kết quả phụ thuộc seed; đọc kèm phần hạn chế trong báo cáo.</span>
+    </footer>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script src="/app.js"></script>
+</body>
+</html>
