@@ -79,11 +79,11 @@ Năm trường hợp dễ làm hỏng chương trình mà test thường bỏ s�
 **Interfaces:**
 - Produces: repo git, môi trường Python có numpy/scipy/networkx/matplotlib/pandas/pytest, `pytest` chạy được.
 
-- [ ] **Step 1:** Copy `s11721-026-00264-7.pdf` từ Downloads vào thư mục dự án.
-- [ ] **Step 2:** `git init`, viết `.gitignore` (`.venv/`, `results/`, `figures/`, `__pycache__/`, `.superpowers/`).
-- [ ] **Step 3:** Tạo `venv`, cài dependencies, ghi `requirements.txt`; `pytest.ini` trỏ `testpaths = tests`.
-- [ ] **Step 4:** Chạy `pytest` → "no tests ran" (exit 5) là đúng.
-- [ ] **Step 5:** Commit `chore: project scaffold`.
+- [x] **Step 1:** Copy `s11721-026-00264-7.pdf` từ Downloads vào thư mục dự án.
+- [x] **Step 2:** `git init`, viết `.gitignore` (`.venv/`, `results/`, `figures/`, `__pycache__/`, `.superpowers/`).
+- [x] **Step 3:** Tạo `venv`, cài dependencies, ghi `requirements.txt`; `pytest.ini` trỏ `testpaths = tests`.
+- [x] **Step 4:** Chạy `pytest` → "no tests ran" (exit 5) là đúng.
+- [x] **Step 5:** Commit `chore: project scaffold`.
 
 ---
 
@@ -94,7 +94,7 @@ Năm trường hợp dễ làm hỏng chương trình mà test thường bỏ s�
 **Interfaces:**
 - Produces: `SCENARIOS: dict[str, tuple[float, float]]`; `make_q(scenario="middle", n=10) -> np.ndarray`; `sample_rewards(q, actions, delta, rng) -> np.ndarray`; `class Bandit` với `pull(actions) -> np.ndarray` và property `best -> int`.
 
-- [ ] **Step 1: Viết test fail**
+- [x] **Step 1: Viết test fail**
 
 ```python
 def test_q_middle_is_evenly_spaced_between_04_and_07():
@@ -110,10 +110,10 @@ def test_best_is_the_argmax_action():
     assert Bandit(make_q("middle")).best == 9
 ```
 
-- [ ] **Step 2:** `pytest tests/test_bandit.py -v` → FAIL `ImportError`.
-- [ ] **Step 3:** Implement.
-- [ ] **Step 4:** `pytest tests/test_bandit.py -v` → 3 passed.
-- [ ] **Step 5:** Commit `feat: bandit environment`.
+- [x] **Step 2:** `pytest tests/test_bandit.py -v` → FAIL `ImportError`.
+- [x] **Step 3:** Implement.
+- [x] **Step 4:** `pytest tests/test_bandit.py -v` → 3 passed.
+- [x] **Step 5:** Commit `feat: bandit environment`.
 
 ---
 
@@ -125,7 +125,7 @@ def test_best_is_the_argmax_action():
 - Consumes: `sample_rewards` từ Task 1.
 - Produces: `trd_step(pi, q, dt=1.0)`, `mrd_step(pi, q, dt=1.0)`, `p_cl_step(pi, q, rng, B=1000, delta=0.1)`, `p_mcl_step(pi, q, rng, B=1000, delta=0.1)` — đều trả vector policy đã chuẩn hoá, không NaN.
 
-- [ ] **Step 1: Viết test fail**
+- [x] **Step 1: Viết test fail**
 
 ```python
 def test_p_mcl_equals_reward_weighted_frequencies():
@@ -147,10 +147,10 @@ def test_mrd_survives_a_dead_type():
     assert not np.isnan(mrd_step(pi, q)).any()
 ```
 
-- [ ] **Step 2:** FAIL `ImportError`.
-- [ ] **Step 3:** Implement (P-MCL rút gọn về `bincount(weights=rewards)/rewards.sum()`).
-- [ ] **Step 4:** PASS.
-- [ ] **Step 5:** Commit `feat: replicator dynamics and MCL update rules`.
+- [x] **Step 2:** FAIL `ImportError`.
+- [x] **Step 3:** Implement (P-MCL rút gọn về `bincount(weights=rewards)/rewards.sum()`).
+- [x] **Step 4:** PASS.
+- [x] **Step 5:** Commit `feat: replicator dynamics and MCL update rules`.
 
 ---
 
@@ -161,7 +161,7 @@ def test_mrd_survives_a_dead_type():
 **Interfaces:**
 - Produces: `well_mixed_voter(types, rewards, rng, n_types=None, M=None) -> np.ndarray`; `graph_voter(types, rewards, adj, rng, n_types=None) -> np.ndarray` với `adj` là `scipy.sparse.csr_matrix` không self-loop.
 
-- [ ] **Step 1: Viết test fail**
+- [x] **Step 1: Viết test fail**
 
 ```python
 def test_equal_rewards_give_frequency_proportional_votes():
@@ -185,10 +185,10 @@ def test_graph_voter_only_produces_types_present_in_neighbourhood():
     assert out[0] == 1
 ```
 
-- [ ] **Step 2:** FAIL.
-- [ ] **Step 3:** Implement bằng `W = adj @ onehot*rewards`, sample theo hàng.
-- [ ] **Step 4:** PASS.
-- [ ] **Step 5:** Commit `feat: weighted voter on well-mixed and graph topologies`.
+- [x] **Step 2:** FAIL.
+- [x] **Step 3:** Implement bằng `W = adj @ onehot*rewards`, sample theo hàng.
+- [x] **Step 4:** PASS.
+- [x] **Step 5:** Commit `feat: weighted voter on well-mixed and graph topologies`.
 
 ---
 
@@ -199,7 +199,7 @@ def test_graph_voter_only_produces_types_present_in_neighbourhood():
 **Interfaces:**
 - Produces: `ws_graph(n, k, p, seed)`, `rgg_graph(n, radius, seed)` (trả CSR); `is_connected(adj) -> bool`; `relaxation_time(adj) -> tuple[float, float]` trả `(lambda2, tau)`, `tau = inf` khi mất kết nối; `degree_stats(adj) -> dict`.
 
-- [ ] **Step 1: Viết test fail**
+- [x] **Step 1: Viết test fail**
 
 ```python
 def test_complete_graph_relaxes_in_about_one_step():
@@ -217,10 +217,10 @@ def test_disconnected_graph_returns_infinite_tau():
     assert np.isinf(tau)
 ```
 
-- [ ] **Step 2:** FAIL.
-- [ ] **Step 3:** Implement với `scipy.sparse.linalg.eigsh(..., k=2, which="LM")`.
-- [ ] **Step 4:** PASS.
-- [ ] **Step 5:** Commit `feat: graph generators and spectral relaxation time`.
+- [x] **Step 2:** FAIL.
+- [x] **Step 3:** Implement với `scipy.sparse.linalg.eigsh(..., k=2, which="LM")`.
+- [x] **Step 4:** PASS.
+- [x] **Step 5:** Commit `feat: graph generators and spectral relaxation time`.
 
 ---
 
@@ -231,7 +231,7 @@ def test_disconnected_graph_returns_infinite_tau():
 **Interfaces:**
 - Produces: `best_mass(types, best) -> float`; `t90(curve, threshold=0.9, window=5) -> tuple[float, bool]` (giá trị, đã đạt hay censored); `consensus(pi) -> float`; `l2_to_reference(curve, reference) -> float`.
 
-- [ ] **Step 1: Viết test fail**
+- [x] **Step 1: Viết test fail**
 
 ```python
 def test_t90_finds_first_crossing_of_smoothed_curve():
@@ -247,10 +247,10 @@ def test_consensus_is_max_policy_component():
     assert consensus(np.array([0.1, 0.7, 0.2])) == pytest.approx(0.7)
 ```
 
-- [ ] **Step 2:** FAIL.
-- [ ] **Step 3:** Implement.
-- [ ] **Step 4:** PASS.
-- [ ] **Step 5:** Commit `feat: learning-curve metrics`.
+- [x] **Step 2:** FAIL.
+- [x] **Step 3:** Implement.
+- [x] **Step 4:** PASS.
+- [x] **Step 5:** Commit `feat: learning-curve metrics`.
 
 ---
 
@@ -262,11 +262,11 @@ def test_consensus_is_max_policy_component():
 - Consumes: toàn bộ Task 1–5.
 - Produces: `run_reproduction(n=10, N=1000, steps=300, seeds=100, scenario="middle") -> dict[str, np.ndarray]`; file `results/reproduction.npz`; hình `figures/fig1_reproduction.png`.
 
-- [ ] **Step 1: Viết test fail** — MRD và P-MCL phải trùng nhau ở t=50 trong sai số 0.05 khi B=N.
-- [ ] **Step 2:** FAIL.
-- [ ] **Step 3:** Implement.
-- [ ] **Step 4:** Chạy `python scripts/run_all.py --only reproduction`; kiểm tra hình và file npz tồn tại; PASS.
-- [ ] **Step 5:** Commit `feat: reproduction of well-mixed learning curves`.
+- [x] **Step 1: Viết test fail** — MRD và P-MCL phải trùng nhau ở t=50 trong sai số 0.05 khi B=N.
+- [x] **Step 2:** FAIL.
+- [x] **Step 3:** Implement.
+- [x] **Step 4:** Chạy `python scripts/run_all.py --only reproduction`; kiểm tra hình và file npz tồn tại; PASS.
+- [x] **Step 5:** Commit `feat: reproduction of well-mixed learning curves`.
 
 ---
 
@@ -278,11 +278,11 @@ def test_consensus_is_max_policy_component():
 - Consumes: Task 1–5.
 - Produces: `run_graph_sweep(...) -> pandas.DataFrame`; `results/graph_sweep.csv`; `figures/fig2_law.png`, `fig3_collapse.png`, `fig4_trajectories.png`.
 
-- [ ] **Step 1: Viết test fail** — với đồ thị đầy đủ (τ≈1), `t90` phải xấp xỉ well-mixed.
-- [ ] **Step 2:** FAIL.
-- [ ] **Step 3:** Implement quét WS (`p ∈ {0, 1e-4, 1e-3, 0.01, 0.05, 0.1, 0.2, 0.4, 0.7, 1.0}`, k=6) và RGG (`radius = c·sqrt(log N/(πN))`, c ∈ [0.8, 2.0]).
-- [ ] **Step 4:** Chạy sweep, xuất CSV + 3 hình; PASS.
-- [ ] **Step 5:** Commit `feat: graph structure experiment and law figure`.
+- [x] **Step 1: Viết test fail** — với đồ thị đầy đủ (τ≈1), `t90` phải xấp xỉ well-mixed.
+- [x] **Step 2:** FAIL.
+- [x] **Step 3:** Implement quét WS (`p ∈ {0, 1e-4, 1e-3, 0.01, 0.05, 0.1, 0.2, 0.4, 0.7, 1.0}`, k=6) và RGG (`radius = c·sqrt(log N/(πN))`, c ∈ [0.8, 2.0]).
+- [x] **Step 4:** Chạy sweep, xuất CSV + 3 hình; PASS.
+- [x] **Step 5:** Commit `feat: graph structure experiment and law figure`.
 
 ---
 
@@ -290,10 +290,10 @@ def test_consensus_is_max_policy_component():
 
 **Files:** Create `report/report.md`, `report/figures/`
 
-- [ ] **Step 1:** Viết báo cáo tiếng Việt theo cấu trúc: Giới thiệu → Cơ sở lý thuyết → Tái tạo kết quả → Mở rộng đồ thị → Kết quả & thảo luận → Hạn chế → Tài liệu tham khảo.
-- [ ] **Step 2:** Chèn hình từ `figures/`, kiểm tra đọc được khi in đen trắng.
-- [ ] **Step 3:** Xuất PDF.
-- [ ] **Step 4:** Commit `docs: report`.
+- [x] **Step 1:** Viết báo cáo tiếng Việt theo cấu trúc: Giới thiệu → Cơ sở lý thuyết → Tái tạo kết quả → Mở rộng đồ thị → Kết quả & thảo luận → Hạn chế → Tài liệu tham khảo.
+- [x] **Step 2:** Chèn hình từ `figures/`, kiểm tra đọc được khi in đen trắng.
+- [x] **Step 3:** Xuất PDF.
+- [x] **Step 4:** Commit `docs: report`.
 
 ---
 

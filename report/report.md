@@ -8,7 +8,7 @@
 
 ## Tóm tắt
 
-Bài báo *The hive mind is a single reinforcement learning agent* (Soma và cộng sự, 2026) chứng minh rằng một đàn cá thể chỉ bắt chước lẫn nhau vẫn tạo ra hành vi học tập tương đương một tác tử học tăng cường duy nhất, với điều kiện quần thể được trộn đều. Đồ án này gồm hai phần. Phần thứ nhất tái tạo kết quả cốt lõi của bài báo bằng NumPy: đường học của mô hình bầy đàn, của thuật toán Maynard-Cross Learning song song, và của đường MRD rời rạc trùng nhau với sai lệch lớn nhất 0,018. Phần thứ hai đặt đàn lên một đồ thị giao tiếp cố định — đúng phần mà bài báo để ngỏ — và hỏi cấu trúc đồ thị thay đổi tốc độ học như thế nào. Khảo sát 22 lần chạy trên Watts–Strogatz, random geometric graph và một họ hai buồng cho thấy giả thuyết ban đầu (thời gian hội tụ tỉ lệ với thời gian relaxation `τ = 1/(1−λ₂)`) chỉ đúng trong từng họ. Đường đi trung bình `L` mô tả được cả WS lẫn RGG bằng một quy luật tuyến tính `t₉₀ = 44,85 + 3,46·L` (`R² = 0,91`), nhưng chẩn đoán thống kê cho thấy đây là xấp xỉ mô tả chứ không phải định luật: CI 95% của độ dốc là 3,04–6,67, một cấu hình WS có Cook's D = 10, hiệu ứng họ là +13,4 bước (`p = 0,039`), và bậc trung bình giải thích thêm 5,1% phương sai. Quan trọng hơn, ba cấu hình hai buồng cũ không kiểm định được việc thông tin đi qua cầu: cả hai buồng đều đã chứa type tốt, nên `t₉₀ = 47,5` chỉ phản ánh học cục bộ. Khi chỉ gieo type tốt vào một buồng (`N = 300`, 600 bước, 30 seed), `t₅₀` trung vị giảm từ 425 bước (cầu 1; 27% seed đạt) xuống 132 bước (cầu 12; 93% seed đạt) trong khi `L ≈ 1,9–2,0`. Kết luận: cấu trúc tác động qua ít nhất hai kênh — khoảng cách thông tin và dung lượng nút cổ chai — nên không một thang đo đơn lẻ nào là đủ.
+Bài báo *The hive mind is a single reinforcement learning agent* (Soma và cộng sự, 2026) chứng minh rằng một đàn cá thể chỉ bắt chước lẫn nhau vẫn tạo ra hành vi học tập tương đương một tác tử học tăng cường duy nhất, với điều kiện quần thể được trộn đều. Đồ án này gồm hai phần. Phần thứ nhất tái tạo kết quả cốt lõi của bài báo bằng NumPy: đường học của mô hình bầy đàn, của thuật toán Maynard-Cross Learning song song, và của đường MRD rời rạc trùng nhau với sai lệch lớn nhất 0,018. Phần thứ hai đặt đàn lên một đồ thị giao tiếp cố định — đúng phần mà bài báo để ngỏ — và hỏi cấu trúc đồ thị thay đổi tốc độ học như thế nào. Khảo sát 22 lần chạy trên Watts–Strogatz, random geometric graph và một họ hai buồng cho thấy giả thuyết ban đầu (thời gian hội tụ tỉ lệ với thời gian relaxation `τ = 1/(1−λ₂)`) chỉ đúng trong từng họ. Đường đi trung bình `L` mô tả được cả WS lẫn RGG bằng một quy luật tuyến tính `t₉₀ = 44,85 + 3,46·L` (`R² = 0,91`), nhưng chẩn đoán thống kê cho thấy đây là xấp xỉ mô tả chứ không phải định luật: CI 95% của độ dốc là 3,04–6,67, một cấu hình WS có Cook's D = 10, hiệu ứng họ là +13,4 bước (`p = 0,039`), và bậc trung bình giải thích thêm 5,1% phương sai. Quan trọng hơn, ba cấu hình hai buồng cũ không kiểm định được việc thông tin đi qua cầu: cả hai buồng đều đã chứa type tốt, nên `t₉₀ = 47,5` chỉ phản ánh học cục bộ. Khi chỉ gieo type tốt vào một buồng (`N = 300`, 600 bước, 30 seed), `t₅₀` trung vị giảm từ 425,5 bước (cầu 1; 27% seed đạt) xuống 132,5 bước (cầu 12; 93% seed đạt) trong khi `L ≈ 1,9–2,0`. Kết luận: cấu trúc tác động qua ít nhất hai kênh — khoảng cách thông tin và dung lượng nút cổ chai — nên không một thang đo đơn lẻ nào là đủ.
 
 ## 1. Giới thiệu
 
@@ -83,7 +83,7 @@ Trong mô hình well-mixed, `N(i)` là toàn bộ quần thể trừ chính `i`.
 τ = 1/(1 − λ₂)
 ```
 
-là thang thời gian của quá trình khuếch tán trên đồ thị. `τ ≈ 1` tương ứng quần thể trộn đều; `τ` lớn tương ứng thông tin lan chậm. Lưu ý `λ₂` một mình không đủ: với vòng lattice 500 đỉnh bậc 6 (WS `p = 0`), `λ₂ ≈ 0,9996` trông gần hoàn hảo nhưng `τ ≈ 2714` bước.
+là thang thời gian của quá trình khuếch tán trên đồ thị. `τ ≈ 1` tương ứng quần thể trộn đều; `τ` lớn tương ứng thông tin lan chậm. Lưu ý `λ₂` một mình không đủ: với vòng lattice 500 đỉnh bậc 6 (WS `p = 0`), `λ₂ ≈ 0,9996` trông gần hoàn hảo nhưng `τ ≈ 2.714` bước.
 
 **Đường đi trung bình.** `L` là khoảng cách ngắn nhất trung bình trên mọi cặp đỉnh liên thông. Đây là thang *khoảng cách* của đồ thị, không phải thang *thời gian trộn*.
 
@@ -154,9 +154,9 @@ Bảng 1 tóm tắt 19 topology liên thông phân biệt. Tổng cộng có 22 
 | WS | p = 0,1 | 31,1 | 5,40 | 70,0 | 1,00 | 1,00 | 1,00 |
 | WS | p = 0,05 | 54,4 | 6,43 | 77,5 | 1,00 | 1,00 | 1,00 |
 | WS | p = 0,01 | 281 | 11,26 | 110,0 | 1,00 | 1,00 | 1,00 |
-| WS | p = 10⁻³ | 1878 | 26,09 | 155,5 | 0,96 | 1,00 | 0,89 |
-| WS | p = 0 | 2714 | 42,08 | 173,5 | 0,90 | 1,00 | 0,82 |
-| hai buồng | cầu = 6 | 5.228 | 1,98 | 47,5 | 1,00 | 1,00 | 1,00 |
+| WS | p = 10⁻³ | 1.878 | 26,09 | 155,5 | 0,96 | 1,00 | 0,89 |
+| WS | p = 0 | 2.714 | 42,08 | 173,5 | 0,90 | 1,00 | 0,82 |
+| hai buồng | cầu = 6 | 5.229 | 1,98 | 47,5 | 1,00 | 1,00 | 1,00 |
 | hai buồng | cầu = 3 | 10.458 | 1,99 | 47,5 | 1,00 | 1,00 | 1,00 |
 | hai buồng | cầu = 1 | 31.374 | 2,00 | 47,5 | 1,00 | 1,00 | 1,00 |
 
@@ -192,7 +192,7 @@ Kết luận cần thận trọng hơn: **cấu trúc đồ thị ảnh hưởng
 
 ### 5.2. Can thiệp hai buồng: thiết kế cũ là can thiệp rỗng
 
-Ba dòng cuối Bảng 1 được thiết kế để tách `τ` khỏi `L`: hai clique 250 nút nối bằng cầu 1, 3 hoặc 6 cạnh làm `τ` tăng sáu lần trong khi `L ≈ 2,0`. Nhưng thiết kế đó **không kiểm định được** điều nó định kiểm định. Cả hai buồng đều khởi tạo cân bằng trên đủ 10 type, nên xác suất buồng đích *không* chứa type tốt là `0,9²⁵⁰ ≈ 3,6·10⁻¹²`. Type tốt gần như chắc chắn đã có sẵn ở cả hai buồng; cầu không mang thông tin cần thiết nào. Vì vậy `t₉₀ = 47,5` ở cả ba cầu chỉ là thời gian học cục bộ bên trong một clique 250 nút — hơi nhanh hơn đồ thị đầy đủ `N = 500` (`t₉₀ = 44,0`) vì quần thể nhỏ hơn. Ba dòng này không phải bằng chứng rằng `t₉₀` bám theo `L` hay bỏ qua `τ`; chúng chỉ cho thấy một can thiệp rỗng, đúng như dự đoán.
+Ba dòng cuối Bảng 1 được thiết kế để tách `τ` khỏi `L`: hai clique 250 nút nối bằng cầu 1, 3 hoặc 6 cạnh làm `τ` tăng sáu lần trong khi `L ≈ 2,0`. Nhưng thiết kế đó **không kiểm định được** điều nó định kiểm định. Cả hai buồng đều khởi tạo cân bằng trên đủ 10 type, nên xác suất buồng đích *không* chứa type tốt là `0,9²⁵⁰ ≈ 3,6·10⁻¹²`. Type tốt gần như chắc chắn đã có sẵn ở cả hai buồng; cầu không mang thông tin cần thiết nào. Vì vậy `t₉₀ = 47,5` ở cả ba cầu chỉ là thời gian học cục bộ bên trong một clique 250 nút — hơi chậm hơn đồ thị đầy đủ `N = 500` (`t₉₀ = 44,0`) do nhiễu mẫu hữu hạn trên quần thể nhỏ hơn. Ba dòng này không phải bằng chứng rằng `t₉₀` bám theo `L` hay bỏ qua `τ`; chúng chỉ cho thấy một can thiệp rỗng, đúng như dự đoán.
 
 Để kiểm định đúng, đồ án chạy thí nghiệm **gieo nguồn**: type tốt chỉ tồn tại trong buồng nguồn, còn buồng đích khởi tạo đều trên 9 type còn lại. Muốn buồng đích học được, thông tin bắt buộc phải đi qua cầu. Bảng 1b và Hình 4 trình bày kết quả.
 
@@ -271,7 +271,7 @@ Ba thí nghiệm khớp với bức tranh hai kênh. Đồ thị đầy đủ v�
 
 Khi phá vỡ giả định trộn đều bằng cách đặt đàn lên đồ thị, kết quả cho thấy tốc độ học không thể gói gọn trong một thang đo duy nhất. Trên 16 cấu hình không can thiệp (đầy đủ, WS, RGG), `t₉₀ = 44,85 + 3,46·L` với `R² = 0,91`, nhưng độ dốc có CI 95% 3,04–6,67, tồn tại hiệu ứng họ +13,4 bước, và bậc giải thích thêm 5,1% phương sai. Quy luật này là **mô tả hữu ích**, không phải định luật phổ quát.
 
-Quan trọng hơn, thiết kế hai buồng cũ không kiểm định được việc thông tin qua cầu: cả hai buồng đều đã chứa type tốt, nên `t₉₀ = 47,5` chỉ là học cục bộ. Khi gieo type tốt vào một buồng, ở `L ≈ 1,9–2,0`, `t₅₀` giảm từ 425 xuống 132 bước và tỉ lệ seed đạt 50% tăng từ 0,27 lên 0,93 chỉ nhờ tăng độ rộng cầu. Kết luận đúng là cấu trúc tác động qua **ít nhất hai kênh**: khoảng cách thông tin (được `L` đo) và dung lượng lát cắt (bị `L` bỏ qua). Một lý thuyết đầy đủ về học tập trên đồ thị cần cả hai, hoặc một đại lượng gộp như thời gian qua lát cắt hẹp nhất.
+Quan trọng hơn, thiết kế hai buồng cũ không kiểm định được việc thông tin qua cầu: cả hai buồng đều đã chứa type tốt, nên `t₉₀ = 47,5` chỉ là học cục bộ. Khi gieo type tốt vào một buồng, ở `L ≈ 1,9–2,0`, `t₅₀` giảm từ 425,5 xuống 132,5 bước và tỉ lệ seed đạt 50% tăng từ 0,27 lên 0,93 chỉ nhờ tăng độ rộng cầu. Kết luận đúng là cấu trúc tác động qua **ít nhất hai kênh**: khoảng cách thông tin (được `L` đo) và dung lượng lát cắt (bị `L` bỏ qua). Một lý thuyết đầy đủ về học tập trên đồ thị cần cả hai, hoặc một đại lượng gộp như thời gian qua lát cắt hẹp nhất.
 
 Về mặt phương pháp, đồ án cho thấy một hướng nghiên cứu nhỏ nhưng trọn vẹn: lấy một chứng minh có điều kiện, phá điều kiện đó, đo cái gì thay đổi, và kiểm tra xem thiết kế thí nghiệm có thực sự can thiệp vào cơ chế hay không. Bài học lớn nhất không phải là một công thức `t₉₀ ~ L`, mà là việc phát hiện thiết kế hai buồng ban đầu là can thiệp rỗng — và sửa nó bằng cách gieo nguồn. Bước tiếp theo là lặp thí nghiệm gieo nguồn trên nhiều đồ thị và nhiều `N`, đo trực tiếp thông lượng qua cầu, và mở rộng sang mạng đuôi nặng nơi weighted voter thiên lệch theo bậc.
 
