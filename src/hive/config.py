@@ -80,3 +80,23 @@ TWO_ROOM_REPLICATES: dict[str, dict] = {
         "seeds": 4,
     },
 }
+
+# Sparse-room version of the replicated source-room experiment. Rooms are
+# random regular graphs, so at the same bridge width ``tau`` drops by roughly
+# ``degree / (N / 2)`` while the bridge-per-node ratio ``phi`` is unchanged.
+TWO_ROOM_SPARSE: dict[str, dict] = {
+    "full": {
+        "sizes": {200: 800, 400: 1600, 600: 2400},
+        "bridges": [1, 2, 4, 8, 16],
+        "room_degrees": [8, 24],
+        "graph_seeds": 4,
+        "seeds": 20,
+    },
+    "quick": {
+        "sizes": {60: 200, 100: 300},
+        "bridges": [1, 4],
+        "room_degrees": [6],
+        "graph_seeds": 2,
+        "seeds": 4,
+    },
+}

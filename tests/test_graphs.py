@@ -69,3 +69,29 @@ def test_two_room_graph_has_bottleneck() -> None:
     # Narrow bridge must inflate tau by an order of magnitude vs a clique.
     _, tau_clique = relaxation_time(complete_graph_adj(50))
     assert tau > 10 * tau_clique
+
+
+def test_sparse_rooms_are_regular_except_at_bridge_endpoints() -> None:
+    adj = two_room_graph(100, bridge=3, seed=1, room_degree=6)
+    degrees = np.asarray(adj.sum(axis=1)).ravel()
+    assert is_connected(adj)
+    assert set(np.unique(degrees)) <= {6, 7}
+    assert (degrees == 7).sum() == 6  # three endpoints per room
+    assert adj.diagonal().sum() == 0
+
+
+def test_sparse_rooms_lower_tau_at_the_same_bridge_width() -> None:
+    _, tau_clique = relaxation_time(two_room_graph(100, bridge=2, seed=0))
+    _, tau_sparse = relaxation_time(two_room_graph(100, bridge=2, seed=0, room_degree=6))
+    assert tau_sparse < tau_clique / 3
+
+
+def test_room_degree_at_least_clique_size_falls_back_to_clique() -> None:
+    clique = two_room_graph(40, bridge=2, seed=3)
+    same = two_room_graph(40, bridge=2, seed=3, room_degree=19)
+    assert (clique != same).nnz == 0
+
+
+def test_sparse_rooms_reject_odd_degree_sum() -> None:
+    with pytest.raises(ValueError):
+        two_room_graph(42, bridge=2, seed=0, room_degree=5)  # 21 * 5 is odd

@@ -63,6 +63,16 @@ python scripts/check_two_room_replicates.py --quick  # vài giây
 python scripts/check_two_room_replicates.py --refit  # tính lại fit từ CSV đã lưu
 ```
 
+Tách `τ` khỏi độ dẫn của cầu bằng buồng thưa (đồ thị đều ngẫu nhiên bậc `d`
+thay cho clique; cần chạy `check_two_room_replicates.py` trước vì kết quả
+được gộp với lưới clique):
+
+```bash
+python scripts/check_two_room_sparse.py          # ~15 phút; Hình 6
+python scripts/check_two_room_sparse.py --quick  # vài giây
+python scripts/check_two_room_sparse.py --refit  # tính lại fit từ CSV đã lưu
+```
+
 `check_two_room.py` chỉ gieo type tốt nhất vào một buồng, rồi đo thời gian
 lan sang buồng còn lại theo độ rộng cầu. Đây là thiết kế can thiệp thay cho
 cấu hình hai buồng cũ (cả hai buồng đều đã có type tốt, nên cầu không mang
@@ -139,7 +149,7 @@ src/hive/          thư viện mô phỏng
   bandit.py        môi trường multi-armed bandit
   models.py        TRD, MRD, P-CL, P-MCL
   swarm.py         weighted voter well-mixed và trên đồ thị
-  graphs.py        sinh đồ thị, tau, đường đi trung bình
+  graphs.py        sinh đồ thị (kể cả hai buồng clique/thưa), tau, đường đi trung bình
   metrics.py       t90, final mass, consensus, L2
   reproduce.py     thí nghiệm A (tái tạo)
   graph_sweep.py   thí nghiệm B (khảo sát đồ thị) + can thiệp hai buồng
@@ -166,6 +176,7 @@ report/            report.md (nguồn) và report.pdf (tự động sinh)
 | Bảng 2 (mạng đuôi nặng) | `check_heavy_tail.py` |
 | Hình 4 (gieo nguồn hai buồng) | `check_two_room.py` |
 | Bảng 1c, Hình 5 (nhân rộng gieo nguồn) | `check_two_room_replicates.py` |
+| Bảng 1d–1e, Hình 6 (buồng thưa, `τ` vs `cầu/bậc`) | `check_two_room_sparse.py` |
 | CI / Cook's D / leave-one-out | `analyze_law.py` → `results/law_diagnostics.json` |
 
 ## Ghi chú

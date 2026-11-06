@@ -122,3 +122,74 @@ def test_replicate_figure_is_written(tmp_path):
     df = run_replicates({40: 60, 60: 80}, [2, 6], graph_seeds=2, seeds=3, n_types=5)
     paths = plot_two_room_replicates(summarise(df, n_boot=30), tmp_path)
     assert all(p.exists() and p.stat().st_size > 0 for p in paths)
+
+
+def test_with_room_columns_upgrades_clique_only_frames():
+    import pandas as pd
+
+    from hive.bridge import with_room_columns
+
+    old = pd.DataFrame({"N": [100], "bridge": [4]})
+    out = with_room_columns(old)
+    assert out["room_degree"].iloc[0] == 0
+    assert out["degree"].iloc[0] == 49
+    assert out["phi"].iloc[0] == pytest.approx(4 / 50)
+    assert out["phi_vol"].iloc[0] == pytest.approx(4 / (50 * 49))
+    assert out["phi_deg"].iloc[0] == pytest.approx(4 / 49)
+
+
+def test_sparse_rooms_lower_tau_but_keep_phi():
+    clique = run_replicates({60: 30}, [4], graph_seeds=2, seeds=2, n_types=5)
+    sparse = run_replicates({60: 30}, [4], graph_seeds=2, seeds=2, n_types=5, room_degree=6)
+    assert (sparse["room_degree"] == 6).all() and (clique["room_degree"] == 0).all()
+    assert sparse["phi"].iloc[0] == clique["phi"].iloc[0]
+    assert sparse["tau"].mean() < clique["tau"].mean() / 3
+    assert sparse["phi_deg"].iloc[0] > clique["phi_deg"].iloc[0]
+
+
+def test_fit_loglog_multi_separates_two_predictors():
+    from hive.bridge import fit_loglog_multi
+
+    a = np.array([1.0, 2.0, 4.0, 1.0, 2.0, 4.0, 3.0])
+    b = np.array([1.0, 1.0, 1.0, 5.0, 5.0, 5.0, 2.0])
+    y = 2.0 * a**-0.7 * b**0.5
+    fit = fit_loglog_multi({"a": a, "b": b}, y)
+    assert fit["a_exp"] == pytest.approx(-0.7)
+    assert fit["b_exp"] == pytest.approx(0.5)
+
+
+def test_compare_predictors_and_bootstrap_multi_run_on_pooled_data():
+    import pandas as pd
+
+    from hive.bridge import bootstrap_multi, compare_predictors
+
+    pooled = pd.concat(
+        [
+            run_replicates({60: 120}, [1, 2, 4], graph_seeds=2, seeds=3, n_types=5),
+            run_replicates({60: 120}, [1, 2, 4], graph_seeds=2, seeds=3, n_types=5, room_degree=6),
+        ],
+        ignore_index=True,
+    )
+    summary = summarise(pooled, n_boot=20)
+    assert set(summary["room_degree"]) == {0, 6}
+    assert {"phi_deg", "phi_vol"} <= set(summary.columns)
+    single = compare_predictors(summary, "t_first_median", ["phi", "tau"])
+    assert set(single) == {"phi", "tau"}
+    cis = bootstrap_multi(pooled, "t_first", "hit_first", ["phi", "tau"], n_boot=20)
+    assert set(cis) <= {"phi", "tau"}
+
+
+def test_sparse_figure_is_written(tmp_path):
+    import pandas as pd
+
+    from hive.plots import plot_two_room_sparse
+
+    pooled = pd.concat(
+        [
+            run_replicates({60: 120}, [1, 4], graph_seeds=2, seeds=3, n_types=5),
+            run_replicates({60: 120}, [1, 4], graph_seeds=2, seeds=3, n_types=5, room_degree=6),
+        ],
+        ignore_index=True,
+    )
+    paths = plot_two_room_sparse(summarise(pooled, n_boot=20), tmp_path)
+    assert all(p.exists() and p.stat().st_size > 0 for p in paths)

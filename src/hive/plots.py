@@ -377,3 +377,45 @@ def plot_two_room_replicates(summary: pd.DataFrame, out_dir: Path) -> list[Path]
 
     fig.tight_layout()
     return _save(fig, out_dir, "fig5_two_room_replicates")
+
+
+def plot_two_room_sparse(summary: pd.DataFrame, out_dir: Path) -> list[Path]:
+    """Wait at the bridge against each candidate predictor, clique and sparse rooms."""
+    sizes = sorted(summary["N"].unique())
+    degrees = sorted(summary["room_degree"].unique())
+    colors = dict(zip(sizes, plt.cm.viridis(np.linspace(0.15, 0.85, len(sizes)))))
+    markers = dict(zip(degrees, ["o", "s", "^", "D"]))
+    panels = [
+        ("phi", r"bridge / (N/2)", "(a) theo số cạnh cầu trên mỗi nút"),
+        ("tau", r"$\tau$", r"(b) theo thời gian relaxation $\tau$"),
+        ("phi_deg", "bridge / bậc phòng", "(c) theo số cạnh cầu trên mỗi hàng xóm"),
+    ]
+    fig, axes = plt.subplots(1, 3, figsize=(13.5, 4.2), sharey=True)
+    for ax, (key, label, title) in zip(axes, panels):
+        for degree in degrees:
+            for N in sizes:
+                sub = summary[(summary["room_degree"] == degree) & (summary["N"] == N)]
+                sub = sub[np.isfinite(sub["t_first_median"])]
+                if sub.empty:
+                    continue
+                ax.scatter(
+                    sub[key],
+                    sub["t_first_median"],
+                    marker=markers[degree],
+                    color=colors[N],
+                    s=34,
+                    alpha=0.85,
+                    edgecolor="black",
+                    linewidth=0.4,
+                    label=f"N={N}, {'clique' if degree == 0 else f'd={degree}'}",
+                )
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+        ax.set_xlabel(label)
+        ax.set_title(title, fontsize=9.5)
+        ax.grid(alpha=0.3, which="both")
+    axes[0].set_ylabel("trung vị `t_first` (bước)")
+    handles, labels = axes[0].get_legend_handles_labels()
+    axes[2].legend(handles, labels, fontsize=6.3, ncol=2, loc="upper right")
+    fig.tight_layout()
+    return _save(fig, out_dir, "fig6_two_room_sparse")

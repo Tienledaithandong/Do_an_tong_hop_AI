@@ -82,11 +82,21 @@ def average_path_length(adj: sparse.spmatrix) -> float:
     return float(finite.mean())
 
 
-def two_room_graph(n: int, bridge: int = 3, seed: int | None = None) -> sparse.csr_matrix:
-    """Two dense rooms joined by a narrow bridge (a mixing bottleneck).
+def two_room_graph(
+    n: int,
+    bridge: int = 3,
+    seed: int | None = None,
+    room_degree: int | None = None,
+) -> sparse.csr_matrix:
+    """Two rooms joined by a narrow bridge (a mixing bottleneck).
 
     The narrow bridge dramatically slows random-walk mixing (large tau) while
     only modestly increasing shortest-path length (L), so tau and L decouple.
+
+    By default each room is a clique. With ``room_degree=d`` each room is a
+    random ``d``-regular graph instead. At a fixed bridge width this keeps the
+    bridge-per-node ratio unchanged while lowering ``tau`` roughly in
+    proportion to ``d / room_size``, which lets experiments tell the two apart.
     """
     rng = np.random.default_rng(seed)
     half = n // 2
@@ -95,6 +105,9 @@ def two_room_graph(n: int, bridge: int = 3, seed: int | None = None) -> sparse.c
     k = min(bridge, n1, n2)
     bridge_a = rng.choice(n1, size=k, replace=False)
     bridge_b = rng.choice(n2, size=k, replace=False)
+
+    if room_degree is not None and room_degree < min(n1, n2) - 1:
+        return _two_sparse_rooms(n1, n2, room_degree, bridge_a, bridge_b, rng)
 
     row: list[int] = []
     col: list[int] = []
@@ -118,6 +131,32 @@ def two_room_graph(n: int, bridge: int = 3, seed: int | None = None) -> sparse.c
         add(a, n1 + b)
 
     return sparse.csr_matrix((np.ones(len(row)), (row, col)), shape=(n, n))
+
+
+def _two_sparse_rooms(
+    n1: int,
+    n2: int,
+    degree: int,
+    bridge_a: np.ndarray,
+    bridge_b: np.ndarray,
+    rng: np.random.Generator,
+) -> sparse.csr_matrix:
+    if degree < 2:
+        raise ValueError("room_degree must be at least 2")
+    if (n1 * degree) % 2 or (n2 * degree) % 2:
+        raise ValueError("room size times room_degree must be even")
+    rows: list[np.ndarray] = []
+    cols: list[np.ndarray] = []
+    for offset, size in ((0, n1), (n1, n2)):
+        room = nx.random_regular_graph(degree, size, seed=int(rng.integers(2**31 - 1)))
+        edges = np.array(room.edges(), dtype=int) + offset
+        rows.extend([edges[:, 0], edges[:, 1]])
+        cols.extend([edges[:, 1], edges[:, 0]])
+    rows.extend([bridge_a, n1 + bridge_b])
+    cols.extend([n1 + bridge_b, bridge_a])
+    row = np.concatenate(rows)
+    col = np.concatenate(cols)
+    return sparse.csr_matrix((np.ones(row.size), (row, col)), shape=(n1 + n2, n1 + n2))
 
 
 def relaxation_time(adj: sparse.spmatrix) -> tuple[float, float]:
