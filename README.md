@@ -54,6 +54,15 @@ python scripts/check_two_room.py      # ~30 s; ghi results/two_room_source*.csv
 python scripts/analyze_law.py         # ghi results/law_diagnostics.json
 ```
 
+Bản nhân rộng của thí nghiệm này (nhiều đồ thị, nhiều `N`, tách thời gian
+chờ ở cầu khỏi thời gian lan trong buồng, hồi quy theo độ dẫn `φ`):
+
+```bash
+python scripts/check_two_room_replicates.py          # ~20 phút; Hình 5
+python scripts/check_two_room_replicates.py --quick  # vài giây
+python scripts/check_two_room_replicates.py --refit  # tính lại fit từ CSV đã lưu
+```
+
 `check_two_room.py` chỉ gieo type tốt nhất vào một buồng, rồi đo thời gian
 lan sang buồng còn lại theo độ rộng cầu. Đây là thiết kế can thiệp thay cho
 cấu hình hai buồng cũ (cả hai buồng đều đã có type tốt, nên cầu không mang
@@ -135,6 +144,7 @@ src/hive/          thư viện mô phỏng
   reproduce.py     thí nghiệm A (tái tạo)
   graph_sweep.py   thí nghiệm B (khảo sát đồ thị) + can thiệp hai buồng
   analysis.py      chẩn đoán thống kê cho quy luật t90 ~ L
+  bridge.py        nhân rộng gieo nguồn: t_first, độ dẫn của cầu, fit log-log
   plots.py         hình cho báo cáo
   config.py        cấu hình chung (RUN_ALL, HEAVY_TAIL, TWO_ROOM_SOURCE)
   webapp.py        server cục bộ + job runner + API + biểu đồ cho UI
@@ -155,6 +165,7 @@ report/            report.md (nguồn) và report.pdf (tự động sinh)
 | Bảng 1, Hình 2, Hình 3 | `run_all.py --only graph` |
 | Bảng 2 (mạng đuôi nặng) | `check_heavy_tail.py` |
 | Hình 4 (gieo nguồn hai buồng) | `check_two_room.py` |
+| Bảng 1c, Hình 5 (nhân rộng gieo nguồn) | `check_two_room_replicates.py` |
 | CI / Cook's D / leave-one-out | `analyze_law.py` → `results/law_diagnostics.json` |
 
 ## Ghi chú

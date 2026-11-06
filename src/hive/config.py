@@ -62,3 +62,21 @@ TWO_ROOM_SOURCE: dict = {
     "scenario": "middle",
     "bridges": [1, 3, 6, 12],
 }
+
+# Replicated source-room experiment (scripts/check_two_room_replicates.py).
+# ``sizes`` maps N to the number of steps; the horizon grows with N because the
+# wait at a narrow bridge scales with the room size.
+TWO_ROOM_REPLICATES: dict[str, dict] = {
+    "full": {
+        "sizes": {200: 800, 400: 1600, 600: 2400},
+        "bridges": [1, 2, 4, 8, 16],
+        "graph_seeds": 4,
+        "seeds": 20,
+    },
+    "quick": {
+        "sizes": {60: 200, 100: 300},
+        "bridges": [1, 4],
+        "graph_seeds": 2,
+        "seeds": 4,
+    },
+}

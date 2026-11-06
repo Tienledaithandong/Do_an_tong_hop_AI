@@ -306,3 +306,74 @@ def plot_two_room_source(
 
     fig.tight_layout()
     return _save(fig, out_dir, "fig4_two_room_source")
+
+
+def plot_two_room_replicates(summary: pd.DataFrame, out_dir: Path) -> list[Path]:
+    """Wait at the bridge vs conductance, and the split of the delay."""
+    sizes = sorted(summary["N"].unique())
+    colors = plt.cm.viridis(np.linspace(0.15, 0.85, len(sizes)))
+    fig, axes = plt.subplots(1, 2, figsize=(11.0, 4.2))
+
+    ax = axes[0]
+    for color, N in zip(colors, sizes):
+        sub = summary[summary["N"] == N]
+        for key, style in (("t_first", "o-"), ("t50", "s--")):
+            ok = sub[np.isfinite(sub[f"{key}_median"])]
+            ax.plot(
+                ok["phi"],
+                ok[f"{key}_median"],
+                style,
+                color=color,
+                label=f"N={N}, {'lần đầu tới' if key == 't_first' else 't50'}",
+                markersize=4,
+                alpha=0.9 if key == "t_first" else 0.6,
+            )
+            # Bands are dropped where the upper bound is censored (inf).
+            lo = ok[f"{key}_lo"].to_numpy(dtype=float)
+            hi = ok[f"{key}_hi"].to_numpy(dtype=float)
+            hi = np.where(np.isfinite(hi), hi, np.nan)
+            ax.fill_between(
+                ok["phi"].to_numpy(),
+                np.minimum(lo, ok[f"{key}_median"].to_numpy()),
+                hi,
+                color=color,
+                alpha=0.12,
+                linewidth=0,
+            )
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlabel(r"độ dẫn của cầu $\phi$ = cầu / (N/2)")
+    ax.set_ylabel("trung vị số bước")
+    ax.set_title("(a) Thời gian chờ ở cầu theo độ dẫn")
+    ax.legend(fontsize=6.5, ncol=2)
+    ax.grid(alpha=0.3, which="both")
+
+    ax = axes[1]
+    width = 0.8 / len(sizes)
+    bridges = sorted(summary["bridge"].unique())
+    x = np.arange(len(bridges))
+    for k, (color, N) in enumerate(zip(colors, sizes)):
+        sub = summary[summary["N"] == N].set_index("bridge").reindex(bridges)
+        first = sub["t_first_median"].to_numpy(dtype=float)
+        total = sub["t50_median"].to_numpy(dtype=float)
+        pos = x - 0.4 + width * (k + 0.5)
+        ax.bar(pos, first, width * 0.95, color=color, label=f"N={N}: chờ ở cầu")
+        ax.bar(
+            pos,
+            np.where(np.isfinite(total), total - first, 0.0),
+            width * 0.95,
+            bottom=first,
+            color=color,
+            alpha=0.4,
+            label=f"N={N}: lan trong buồng",
+        )
+    ax.set_xticks(x)
+    ax.set_xticklabels([str(b) for b in bridges])
+    ax.set_xlabel("độ rộng cầu (số cạnh)")
+    ax.set_ylabel("trung vị số bước tới t50")
+    ax.set_title("(b) Tách độ trễ: chờ ở cầu và lan trong buồng")
+    ax.legend(fontsize=6.5, ncol=2)
+    ax.grid(alpha=0.3, axis="y")
+
+    fig.tight_layout()
+    return _save(fig, out_dir, "fig5_two_room_replicates")

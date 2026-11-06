@@ -8,7 +8,7 @@
 
 ## Tóm tắt
 
-Bài báo *The hive mind is a single reinforcement learning agent* (Soma và cộng sự, 2026) chứng minh rằng một đàn cá thể chỉ bắt chước lẫn nhau vẫn tạo ra hành vi học tập tương đương một tác tử học tăng cường duy nhất, với điều kiện quần thể được trộn đều. Đồ án này gồm hai phần. Phần thứ nhất tái tạo kết quả cốt lõi của bài báo bằng NumPy: đường học của mô hình bầy đàn, của thuật toán Maynard-Cross Learning song song, và của đường MRD rời rạc trùng nhau với sai lệch lớn nhất 0,018. Phần thứ hai đặt đàn lên một đồ thị giao tiếp cố định — đúng phần mà bài báo để ngỏ — và hỏi cấu trúc đồ thị thay đổi tốc độ học như thế nào. Khảo sát 22 lần chạy trên Watts–Strogatz, random geometric graph và một họ hai buồng cho thấy giả thuyết ban đầu (thời gian hội tụ tỉ lệ với thời gian relaxation `τ = 1/(1−λ₂)`) chỉ đúng trong từng họ. Đường đi trung bình `L` mô tả được cả WS lẫn RGG bằng một quy luật tuyến tính `t₉₀ = 44,85 + 3,46·L` (`R² = 0,91`), nhưng chẩn đoán thống kê cho thấy đây là xấp xỉ mô tả chứ không phải định luật: CI 95% của độ dốc là 3,04–6,67, một cấu hình WS có Cook's D = 10, hiệu ứng họ là +13,4 bước (`p = 0,039`), và bậc trung bình giải thích thêm 5,1% phương sai. Quan trọng hơn, ba cấu hình hai buồng cũ không kiểm định được việc thông tin đi qua cầu: cả hai buồng đều đã chứa type tốt, nên `t₉₀ = 47,5` chỉ phản ánh học cục bộ. Khi chỉ gieo type tốt vào một buồng (`N = 300`, 600 bước, 30 seed), `t₅₀` trung vị giảm từ 425,5 bước (cầu 1; 27% seed đạt) xuống 132,5 bước (cầu 12; 93% seed đạt) trong khi `L ≈ 1,9–2,0`. Kết luận: cấu trúc tác động qua ít nhất hai kênh — khoảng cách thông tin và dung lượng nút cổ chai — nên không một thang đo đơn lẻ nào là đủ.
+Bài báo *The hive mind is a single reinforcement learning agent* (Soma và cộng sự, 2026) chứng minh rằng một đàn cá thể chỉ bắt chước lẫn nhau vẫn tạo ra hành vi học tập tương đương một tác tử học tăng cường duy nhất, với điều kiện quần thể được trộn đều. Đồ án này gồm hai phần. Phần thứ nhất tái tạo kết quả cốt lõi của bài báo bằng NumPy: đường học của mô hình bầy đàn, của thuật toán Maynard-Cross Learning song song, và của đường MRD rời rạc trùng nhau với sai lệch lớn nhất 0,018. Phần thứ hai đặt đàn lên một đồ thị giao tiếp cố định — đúng phần mà bài báo để ngỏ — và hỏi cấu trúc đồ thị thay đổi tốc độ học như thế nào. Khảo sát 22 lần chạy trên Watts–Strogatz, random geometric graph và một họ hai buồng cho thấy giả thuyết ban đầu (thời gian hội tụ tỉ lệ với thời gian relaxation `τ = 1/(1−λ₂)`) chỉ đúng trong từng họ. Đường đi trung bình `L` mô tả được cả WS lẫn RGG bằng một quy luật tuyến tính `t₉₀ = 44,85 + 3,46·L` (`R² = 0,91`), nhưng chẩn đoán thống kê cho thấy đây là xấp xỉ mô tả chứ không phải định luật: CI 95% của độ dốc là 3,04–6,67, một cấu hình WS có Cook's D = 10, hiệu ứng họ là +13,4 bước (`p = 0,039`), và bậc trung bình giải thích thêm 5,1% phương sai. Quan trọng hơn, ba cấu hình hai buồng cũ không kiểm định được việc thông tin đi qua cầu: cả hai buồng đều đã chứa type tốt, nên `t₉₀ = 47,5` chỉ phản ánh học cục bộ. Khi chỉ gieo type tốt vào một buồng (`N = 300`, 600 bước, 30 seed), `t₅₀` trung vị giảm từ 425,5 bước (cầu 1; 27% seed đạt) xuống 132,5 bước (cầu 12; 93% seed đạt) trong khi `L ≈ 1,9–2,0`. Bản nhân rộng trên 4 đồ thị, `N ∈ {200, 400, 600}` và cầu 1–16 (1.200 lần chạy) cho thấy thời gian chờ ở cầu tỉ lệ `φ^−0,71` (`φ` là độ dẫn của cầu; CI 95% −0,75…−0,65), tức dưới tuyến tính theo số cạnh, và chỉ chiếm 10–19% thời gian tới `t₅₀`. Kết luận: cấu trúc tác động qua ít nhất hai kênh — khoảng cách thông tin và dung lượng nút cổ chai — nên không một thang đo đơn lẻ nào là đủ.
 
 ## 1. Giới thiệu
 
@@ -27,7 +27,7 @@ Soma và cộng sự (2026) trả lời là có, trong giới hạn của mô h�
 1. Một bản cài đặt độc lập, có kiểm thử, tái tạo được kết quả cốt lõi của bài báo (Hình 1).
 2. Một khảo sát thực nghiệm trên 22 lần chạy thuộc hai họ ngẫu nhiên (WS, RGG) và một họ hai buồng, với 100 seed mỗi cấu hình (Hình 2, 3; Bảng 1).
 3. Một quy luật mô tả `t₉₀ ~ L` cho WS và RGG, kèm chẩn đoán độ bất định: bootstrap CI, Cook's D, leave-one-out, hiệu ứng họ và ảnh hưởng của bậc.
-4. Một thí nghiệm can thiệp gieo nguồn trên đồ thị hai buồng, cho thấy ở `L` gần như cố định, độ rộng cầu vẫn làm thời gian lan thông tin thay đổi hơn ba lần. Kết quả này bác bỏ cách đọc cũ rằng đồ thị hai buồng là phép kiểm định sạch cho quy luật `L`.
+4. Một thí nghiệm can thiệp gieo nguồn trên đồ thị hai buồng, cho thấy ở `L` gần như cố định, độ rộng cầu vẫn làm thời gian lan thông tin thay đổi hơn ba lần; bản nhân rộng trên 4 đồ thị × 3 kích thước × 5 độ rộng cầu (§5.5) xác nhận hiệu ứng và đo được thời gian chờ ở cầu tỉ lệ `φ^−0,7`. Kết quả này bác bỏ cách đọc cũ rằng đồ thị hai buồng là phép kiểm định sạch cho quy luật `L`.
 
 ## 2. Cơ sở lý thuyết
 
@@ -243,6 +243,43 @@ Ba mạng ngoài phạm vi quét chính được chạy với cùng `N = 500`, 4
 
 Quy luật `L` vẫn giữ trong sai số ±3,4 bước. BA `m = 2` lệch dương, tức mạng đuôi nặng có xu hướng chậm hơn dự đoán; ba điểm chưa đủ để khẳng định quy luật phổ quát cho mọi mạng đuôi nặng. Cần quét có hệ thống theo hệ số biến thiên bậc (degree CV) để kết luận. ER bậc 6 có `τ = ∞` vì đồ thị sinh ra bị phân mảnh, nhưng `L` vẫn hữu hạn trên các cặp đến được.
 
+### 5.5. Nhân rộng thí nghiệm gieo nguồn: độ dẫn của cầu
+
+Thí nghiệm ở §5.2 chỉ có một đồ thị cho mỗi độ rộng cầu và 30 seed. Để kiểm tra nó có bền không, đồ án lặp lại trên lưới `N ∈ {200, 400, 600}` × cầu `{1, 2, 4, 8, 16}`, mỗi ô dùng **4 đồ thị khác nhau** (seed đồ thị 0–3) × 20 seed học, tức 80 lần chạy mỗi ô và 1.200 lần chạy tổng cộng. Horizon tăng theo `N` (800, 1.600 và 2.400 bước) vì thời gian chờ ở cầu hẹp tăng theo kích thước buồng. Mã trong `src/hive/bridge.py`, kết quả trong `results/two_room_replicates*.csv`. Khoảng tin cậy 95% lấy bằng bootstrap **theo đồ thị** (lấy lại mẫu cả đồ thị), nên phản ánh cả biến thiên giữa các đồ thị chứ không chỉ nhiễu seed.
+
+Hai đại lượng mới tách độ trễ thành hai phần đo được: `t_first` là bước đầu tiên buồng đích có ít nhất một bản sao type tốt (thời gian chờ *ở cầu*), và phần còn lại tới `t₅₀` (thời gian lan *trong buồng*). Độ dẫn của cầu được định nghĩa là `φ = cầu / (N/2)`. Trung vị tính trên **mọi** seed, seed chưa đạt ngưỡng được coi là `+∞`; vì thế khác với trung vị có điều kiện ở Bảng 1b, và với cầu 1 nó là giá trị ở rìa dữ liệu bị censor (xem cột tỉ lệ seed đạt).
+
+**Bảng 1c. Gieo nguồn nhân rộng (4 đồ thị × 20 seed mỗi ô; trung vị và CI 95% bootstrap theo đồ thị).**
+
+| N | Cầu | φ | t_first | t₅₀ | seed đạt t₅₀ | seed final ≥ 0,95 |
+|---|---|---|---|---|---|---|
+| 200 | 1 | 0,010 | 105 [86–116] | 654 [403–∞] | 0,59 | 0,54 |
+| 200 | 2 | 0,020 | 58 [53–65] | 418 [353–506] | 0,80 | 0,74 |
+| 200 | 4 | 0,040 | 44 [37–50] | 276 [253–286] | 0,94 | 0,90 |
+| 200 | 8 | 0,080 | 20 [16–25] | 185 [178–209] | 1,00 | 0,99 |
+| 200 | 16 | 0,160 | 13 [10–17] | 104 [89–125] | 0,96 | 0,96 |
+| 400 | 1 | 0,005 | 149 [124–212] | 1.317 [1.088–∞] | 0,58 | 0,53 |
+| 400 | 2 | 0,010 | 70 [61–90] | 623 [498–700] | 0,86 | 0,85 |
+| 400 | 4 | 0,020 | 68 [58–72] | 363 [300–380] | 0,96 | 0,95 |
+| 400 | 8 | 0,040 | 39 [34–51] | 305 [287–361] | 1,00 | 1,00 |
+| 400 | 16 | 0,080 | 21 [20–25] | 201 [179–231] | 1,00 | 1,00 |
+| 600 | 1 | 0,003 | 241 [193–281] | 1.929 [1.716–∞] | 0,60 | 0,58 |
+| 600 | 2 | 0,007 | 135 [124–145] | 1.230 [1.001–1.372] | 0,81 | 0,78 |
+| 600 | 4 | 0,013 | 71 [63–86] | 625 [611–744] | 0,99 | 0,98 |
+| 600 | 8 | 0,027 | 49 [47–56] | 476 [400–489] | 0,99 | 0,98 |
+| 600 | 16 | 0,053 | 33 [30–36] | 278 [266–292] | 1,00 | 1,00 |
+
+![Hình 5. (a) Thời gian chờ ở cầu (`t_first`) và `t₅₀` theo độ dẫn `φ` trên thang log-log, ba kích thước `N`; dải tô là CI 95% theo đồ thị (bỏ ở nơi cận trên bị censor). (b) Tách `t₅₀` thành chờ ở cầu và lan trong buồng.](figures/fig5_two_room_replicates.png)
+
+Bốn kết quả, đều từ `results/two_room_replicates_fits.json`:
+
+1. **Kết quả §5.2 giữ nguyên khi nhân rộng.** `L` chỉ dao động 1,86–2,00 (dưới 8%) trên toàn lưới, trong khi `t₅₀` thay đổi 6–7 lần theo độ rộng cầu (654 → 104 ở `N = 200`; 1.929 → 278 ở `N = 600`). Ở cầu 1, khoảng 40% lần chạy không đạt 50% trong horizon; ở cầu từ 8 trở lên, từ 96% lần chạy trở lên đều đạt.
+2. **Thời gian chờ là hàm của độ dẫn, nhưng sublinear.** Hồi quy log-log cho `t_first ∝ φ^−0,71` (CI 95% theo đồ thị −0,75…−0,65; `R² = 0,97`) và `t₅₀ ∝ φ^−0,70` (CI −0,74…−0,66; `R² = 0,97`). Hồi quy `log t_first` theo `log(cầu)` và `log N` riêng rẽ cho hai số mũ −0,71 và +0,71, tức đối xứng đúng như khi chỉ `φ` quyết định; nếu chỉ dùng độ rộng cầu không có `N`, `R²` tụt xuống 0,80. Số mũ −0,7 loại bỏ giả thuyết "dòng qua cầu tỉ lệ tuyến tính với số cạnh" (sẽ cho −1): `t_first · φ` không hằng, hệ số biến thiên 0,32.
+3. **Với `t₅₀`, kích thước buồng còn quan trọng ngoài `φ`.** Khi tách riêng, số mũ theo độ rộng cầu là −0,66 nhưng số mũ theo `N` là +0,88, lớn hơn về độ lớn. Nghĩa là quần thể lớn hơn chậm hơn mức mà một mình độ dẫn dự đoán; phần lan trong buồng cộng thêm một thành phần phụ thuộc `N`.
+4. **Phần lớn độ trễ nằm *sau* lần tới đầu tiên.** Chờ ở cầu chỉ chiếm khoảng 10–19% `t₅₀`; 81–90% còn lại là thời gian sau khi type tốt đã chạm buồng đích. Lý do đo được: số lần type tốt xuất hiện trong buồng đích trung bình 5–11 mỗi lần chạy, và số lần nó biến mất lại luôn chỉ thấp hơn khoảng 0,6–1 lần. Nói cách khác, hầu hết các lần tới kết thúc bằng việc type tốt biến mất hẳn khỏi buồng đích, và chỉ lần xâm nhập cuối cùng mới tồn tại.
+
+Cần đọc các số mũ này đúng phạm vi: chúng được khớp trên 15 trung vị, mỗi trung vị từ 80 lần chạy trên chỉ 4 đồ thị, nên CI chỉ phản ánh biến thiên giữa 4 đồ thị đó chứ không phải giữa mọi đồ thị hai buồng. Ở cầu 1 trung vị `t₅₀` nằm sát phần bị censor, và cả ba điểm cầu 1 (mỗi `N` một điểm) có cận trên `∞`, nên số mũ có thể lệch ở đầu cầu hẹp.
+
 ## 6. Thảo luận
 
 Vì sao đường đi trung bình lại dự báo tốt hơn thời gian relaxation?
@@ -251,9 +288,9 @@ Spectral gap đo mode chậm nhất của một quá trình **khuếch tán** �
 
 Cách giải thích này khớp với ba quan sát. Thứ nhất, tung độ gốc của quy luật xấp xỉ thời gian học của quần thể trộn đều — phần "không phụ thuộc đồ thị" đúng là động lực học chọn lọc thuần tuý. Thứ hai, hai họ đồ thị có cùng `L` nhưng khác số chiều (vòng 1D so với mặt phẳng 2D) lại nằm sát nhau hơn nhiều so với khi so theo `τ`. Thứ ba, đường học trên vòng lattice có dạng kéo dài chứ không phải trễ rồi bùng nổ — dấu hiệu của lan truyền theo khoảng cách.
 
-Thí nghiệm gieo nguồn ở §5.2 vẽ nốt bức tranh. Khi type tốt chỉ có ở buồng nguồn, thông tin buộc phải qua cầu. Ở `L` gần như cố định (1,93–2,00), `t₅₀` vẫn giảm hơn ba lần khi cầu rộng từ 1 lên 12 cạnh. Vậy có ít nhất hai kênh tác động. Kênh thứ nhất là **khoảng cách mặt trận phải đi**: dưới dòng trôi thiên lệch, mật độ cá thể chọn phương án tốt nhất thoả một phương trình kiểu Fisher–KPP [7, 8], có nghiệm sóng chạy với vận tốc không đổi, nên thời gian phủ 90% quần thể tỉ lệ với quãng đường, tức `L`. Kênh thứ hai là **dung lượng lát cắt**: mỗi bước chỉ một phần nhỏ cá thể ở biên buồng nguồn được thay bằng type tốt, và dòng đó tỉ lệ với số cạnh cầu. Khi cầu hẹp, mặt trận bị nghẽn tại cửa; thời gian chờ tại cửa cộng vào thời gian đi trong buồng đích. Cơ chế này giống một điện trở nối tiếp: hai buồng có "trở kháng" thấp, cầu có trở kháng cao, và tổng thời gian do đoạn trở kháng cao nhất quyết định.
+Thí nghiệm gieo nguồn ở §5.2 vẽ nốt bức tranh. Khi type tốt chỉ có ở buồng nguồn, thông tin buộc phải qua cầu. Ở `L` gần như cố định (1,93–2,00), `t₅₀` vẫn giảm hơn ba lần khi cầu rộng từ 1 lên 12 cạnh. Vậy có ít nhất hai kênh tác động. Kênh thứ nhất là **khoảng cách mặt trận phải đi**: dưới dòng trôi thiên lệch, mật độ cá thể chọn phương án tốt nhất thoả một phương trình kiểu Fisher–KPP [7, 8], có nghiệm sóng chạy với vận tốc không đổi, nên thời gian phủ 90% quần thể tỉ lệ với quãng đường, tức `L`. Kênh thứ hai là **dung lượng lát cắt**: khi cầu hẹp, mặt trận bị nghẽn tại cửa, và thời gian chờ tại cửa cộng vào thời gian đi trong buồng đích. Cơ chế này giống một điện trở nối tiếp: hai buồng có "trở kháng" thấp, cầu có trở kháng cao, và đoạn trở kháng cao nhất chi phối tổng thời gian. Bản nhân rộng ở §5.5 siết chặt hình dung này theo hai hướng. Thứ nhất, nếu dòng qua cầu tỉ lệ tuyến tính với số cạnh thì thời gian chờ phải tỉ lệ với `φ⁻¹`; dữ liệu cho số mũ −0,71 (CI −0,75…−0,65), nên dòng qua cầu **dưới tuyến tính** và giả định tỉ lệ thuận ban đầu không đứng vững. Thứ hai, chờ ở cầu chỉ chiếm 10–19% `t₅₀`. Phần còn lại là thời gian type tốt bị đẩy ra rồi quay lại nhiều lần (5–11 lần tới, gần bằng số lần mất): một lần "tới cầu" chưa phải một lần "thông tin đã qua". Điều này làm giả thuyết điện trở nối tiếp đúng ở chiều hướng nhưng sai ở trọng số: cổ chai thực sự là xác suất một cá thể lẻ trụ được trong buồng đích, chứ không chỉ việc nó có qua được cầu hay không.
 
-Ba thí nghiệm khớp với bức tranh hai kênh. Đồ thị đầy đủ và clique 250 nút có `L` ngắn và không có cổ chai, nên học nhanh (44 và 47,5 bước). WS và RGG có `L` dài nhưng bậc tương đối đều, nên `L` mô tả được. Hai buồng gieo nguồn có `L` ngắn nhưng cổ chai hẹp, nên `L` dự đoán sai và độ rộng cầu mới là biến quyết định. Cách đọc cũ — "hai buồng chứng minh `τ` vô can" — là hệ quả của một can thiệp rỗng, không phải của cơ chế. Phát biểu đúng là: **`L` đo kênh khoảng cách, nhưng không đo kênh dung lượng; một mô hình đầy đủ cần cả hai, hoặc một đại lượng gộp như thời gian qua lát cắt hẹp nhất.** Đây vẫn là giả thuyết cơ chế, chưa phải kết quả đo trực tiếp vận tốc mặt trận hay thông lượng qua cầu; §7 nêu rõ giới hạn này.
+Ba thí nghiệm khớp với bức tranh hai kênh. Đồ thị đầy đủ và clique 250 nút có `L` ngắn và không có cổ chai, nên học nhanh (44 và 47,5 bước). WS và RGG có `L` dài nhưng bậc tương đối đều, nên `L` mô tả được. Hai buồng gieo nguồn có `L` ngắn nhưng cổ chai hẹp, nên `L` dự đoán sai và độ rộng cầu mới là biến quyết định. Cách đọc cũ — "hai buồng chứng minh `τ` vô can" — là hệ quả của một can thiệp rỗng, không phải của cơ chế. Phát biểu đúng là: **`L` đo kênh khoảng cách, nhưng không đo kênh dung lượng; một mô hình đầy đủ cần cả hai, hoặc một đại lượng gộp như thời gian qua lát cắt hẹp nhất.** Số mũ −0,7, tỉ lệ chờ/lan và số lần tới/mất là các phép đo trực tiếp; còn việc giải thích chúng bằng xác suất trụ lại của một cá thể lẻ vẫn là giả thuyết, chưa có phép đo thông lượng qua cầu hay vận tốc mặt trận; §7 nêu rõ giới hạn này.
 
 ## 7. Hạn chế
 
@@ -263,7 +300,7 @@ Ba thí nghiệm khớp với bức tranh hai kênh. Đồ thị đầy đủ v�
 4. **Không có cơ chế khám phá.** Như bài báo gốc, khi một phương án biến mất khỏi quần thể thì nó không thể quay lại. Trong môi trường thay đổi theo thời gian, đàn sẽ không thích nghi được.
 5. **`t₉₀` phụ thuộc ngưỡng và cửa sổ làm trơn.** Đã cố định 0,9 và 5 bước cho mọi cấu hình, nhưng các ngưỡng khác có thể cho hệ số hồi quy khác.
 6. **Quy luật `L` là xấp xỉ mô tả, không phải định luật.** CI 95% của độ dốc là 3,04–6,67; một điểm (`WS p = 0`) có Cook's D = 10 và leverage 0,73; có hiệu ứng họ +13,4 bước (`p = 0,039`); thêm bậc và degree CV giải thích thêm 5,1% phương sai. Nên đọc quy luật trong phạm vi WS/RGG đã khảo sát, không ngoại suy cho mọi đồ thị.
-7. **Thí nghiệm gieo nguồn mới là pilot.** Mỗi độ rộng cầu dùng một đồ thị cố định, `N = 300`, 30 seed, và chỉ quét cầu 1–12. Chưa đo trực tiếp thông lượng qua cầu hay vận tốc mặt trận; `τ` và dung lượng cầu cùng biến thiên nên thí nghiệm này chứng minh `L` không đủ, chứ chưa tách được hai kênh. Cần lặp trên nhiều đồ thị và nhiều `N` để có CI cho hiệu ứng dung lượng.
+7. **Thí nghiệm gieo nguồn.** Bản đầu (§5.2) là pilot: một đồ thị cho mỗi độ rộng cầu, `N = 300`, 30 seed. Bản nhân rộng (§5.5) dùng 4 đồ thị, `N ∈ {200, 400, 600}` và cầu 1–16, nên CI phản ánh biến thiên giữa đồ thị, nhưng chỉ 4 đồ thị mỗi ô và 15 trung vị cho mỗi phép khớp; ở cầu 1 khoảng 40% lần chạy bị censor nên trung vị `t₅₀` không đáng tin bằng các ô khác. Vẫn chưa đo trực tiếp thông lượng qua cầu hay vận tốc mặt trận. `τ` và độ dẫn cầu biến thiên cùng nhau (cả hai do độ rộng cầu quyết định), nên thí nghiệm chứng minh `L` không đủ và chỉ ra `φ` dự đoán tốt thời gian chờ, nhưng không tách được `τ` khỏi `φ`.
 
 ## 8. Kết luận
 
@@ -273,7 +310,7 @@ Khi phá vỡ giả định trộn đều bằng cách đặt đàn lên đồ t
 
 Quan trọng hơn, thiết kế hai buồng cũ không kiểm định được việc thông tin qua cầu: cả hai buồng đều đã chứa type tốt, nên `t₉₀ = 47,5` chỉ là học cục bộ. Khi gieo type tốt vào một buồng, ở `L ≈ 1,9–2,0`, `t₅₀` giảm từ 425,5 xuống 132,5 bước và tỉ lệ seed đạt 50% tăng từ 0,27 lên 0,93 chỉ nhờ tăng độ rộng cầu. Kết luận đúng là cấu trúc tác động qua **ít nhất hai kênh**: khoảng cách thông tin (được `L` đo) và dung lượng lát cắt (bị `L` bỏ qua). Một lý thuyết đầy đủ về học tập trên đồ thị cần cả hai, hoặc một đại lượng gộp như thời gian qua lát cắt hẹp nhất.
 
-Về mặt phương pháp, đồ án cho thấy một hướng nghiên cứu nhỏ nhưng trọn vẹn: lấy một chứng minh có điều kiện, phá điều kiện đó, đo cái gì thay đổi, và kiểm tra xem thiết kế thí nghiệm có thực sự can thiệp vào cơ chế hay không. Bài học lớn nhất không phải là một công thức `t₉₀ ~ L`, mà là việc phát hiện thiết kế hai buồng ban đầu là can thiệp rỗng — và sửa nó bằng cách gieo nguồn. Bước tiếp theo là lặp thí nghiệm gieo nguồn trên nhiều đồ thị và nhiều `N`, đo trực tiếp thông lượng qua cầu, và mở rộng sang mạng đuôi nặng nơi weighted voter thiên lệch theo bậc.
+Về mặt phương pháp, đồ án cho thấy một hướng nghiên cứu nhỏ nhưng trọn vẹn: lấy một chứng minh có điều kiện, phá điều kiện đó, đo cái gì thay đổi, và kiểm tra xem thiết kế thí nghiệm có thực sự can thiệp vào cơ chế hay không. Bài học lớn nhất không phải là một công thức `t₉₀ ~ L`, mà là việc phát hiện thiết kế hai buồng ban đầu là can thiệp rỗng — và sửa nó bằng cách gieo nguồn. Bản nhân rộng trên 4 đồ thị, ba kích thước `N` và cầu 1–16 xác nhận hiệu ứng: thời gian chờ ở cầu tỉ lệ xấp xỉ `φ^−0,7` (CI −0,75…−0,65), tức dưới tuyến tính, nhưng chỉ chiếm 10–19% `t₅₀`, phần còn lại là type tốt bị đẩy ra và quay lại nhiều lần trong buồng đích. Bước tiếp theo là đo trực tiếp thông lượng qua cầu và xác suất trụ lại của một cá thể lẻ, tách `τ` khỏi `φ` bằng các đồ thị có cùng `φ` nhưng khác `τ`, và mở rộng sang mạng đuôi nặng nơi weighted voter thiên lệch theo bậc.
 
 ## Tài liệu tham khảo
 
