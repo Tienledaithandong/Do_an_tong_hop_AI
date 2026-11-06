@@ -100,3 +100,26 @@ TWO_ROOM_SPARSE: dict[str, dict] = {
         "seeds": 4,
     },
 }
+
+# Uneven-degree rooms with the bridge attached to hubs, leaves or random
+# nodes (scripts/check_two_room_hetero.py). Barabasi-Albert rooms with
+# ``m = 3`` have mean degree ~6; the 6-regular layout is the control with the
+# same mean degree and no hubs.
+TWO_ROOM_HETERO: dict[str, dict] = {
+    "full": {
+        "N": 400,
+        "steps": 1000,
+        "bridges": [1, 2, 4, 8],
+        "m": 3,
+        "graph_seeds": 5,
+        "seeds": 20,
+    },
+    "quick": {
+        "N": 80,
+        "steps": 200,
+        "bridges": [1, 4],
+        "m": 3,
+        "graph_seeds": 2,
+        "seeds": 4,
+    },
+}

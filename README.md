@@ -73,6 +73,15 @@ python scripts/check_two_room_sparse.py --quick  # vài giây
 python scripts/check_two_room_sparse.py --refit  # tính lại fit từ CSV đã lưu
 ```
 
+Buồng không đều (Barabási–Albert) với đầu cầu gắn vào hub, lá hoặc nút ngẫu
+nhiên của từng buồng, kèm đối chứng đều bậc 6:
+
+```bash
+python scripts/check_two_room_hetero.py          # ~8 phút; Hình 7
+python scripts/check_two_room_hetero.py --quick  # vài giây
+python scripts/check_two_room_hetero.py --refit  # tính lại fit từ CSV đã lưu
+```
+
 `check_two_room.py` chỉ gieo type tốt nhất vào một buồng, rồi đo thời gian
 lan sang buồng còn lại theo độ rộng cầu. Đây là thiết kế can thiệp thay cho
 cấu hình hai buồng cũ (cả hai buồng đều đã có type tốt, nên cầu không mang
@@ -155,6 +164,7 @@ src/hive/          thư viện mô phỏng
   graph_sweep.py   thí nghiệm B (khảo sát đồ thị) + can thiệp hai buồng
   analysis.py      chẩn đoán thống kê cho quy luật t90 ~ L
   bridge.py        nhân rộng gieo nguồn: t_first, độ dẫn của cầu, fit log-log
+  hetero.py        buồng không đều: vị trí đầu cầu (hub/lá), Σ 1/bậc đầu cầu
   plots.py         hình cho báo cáo
   config.py        cấu hình chung (RUN_ALL, HEAVY_TAIL, TWO_ROOM_SOURCE)
   webapp.py        server cục bộ + job runner + API + biểu đồ cho UI
@@ -177,6 +187,7 @@ report/            report.md (nguồn) và report.pdf (tự động sinh)
 | Hình 4 (gieo nguồn hai buồng) | `check_two_room.py` |
 | Bảng 1c, Hình 5 (nhân rộng gieo nguồn) | `check_two_room_replicates.py` |
 | Bảng 1d–1e, Hình 6 (buồng thưa, `τ` vs `cầu/bậc`) | `check_two_room_sparse.py` |
+| Bảng 1f, Hình 7 (vị trí đầu cầu, hub/lá) | `check_two_room_hetero.py` |
 | CI / Cook's D / leave-one-out | `analyze_law.py` → `results/law_diagnostics.json` |
 
 ## Ghi chú

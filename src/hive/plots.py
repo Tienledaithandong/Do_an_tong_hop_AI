@@ -9,6 +9,7 @@ import matplotlib
 matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
+from matplotlib.ticker import NullFormatter
 import numpy as np
 import pandas as pd
 
@@ -419,3 +420,60 @@ def plot_two_room_sparse(summary: pd.DataFrame, out_dir: Path) -> list[Path]:
     axes[2].legend(handles, labels, fontsize=6.3, ncol=2, loc="upper right")
     fig.tight_layout()
     return _save(fig, out_dir, "fig6_two_room_sparse")
+
+
+def plot_two_room_hetero(summary: pd.DataFrame, out_dir: Path) -> list[Path]:
+    """Wait at the bridge by endpoint placement, and against two predictors."""
+    ba = summary[summary["kind"] == "ba"]
+    target_colors = {"leaf": "#2a9d8f", "random": "#6c757d", "hub": "#d1495b"}
+    source_styles = {"leaf": ":", "random": "-", "hub": "--"}
+    fig, axes = plt.subplots(1, 3, figsize=(13.5, 4.2))
+
+    ax = axes[0]
+    for (source, target), g in ba.groupby(["source", "target"]):
+        g = g[np.isfinite(g["t_first_median"])].sort_values("bridge")
+        ax.plot(
+            g["bridge"],
+            g["t_first_median"],
+            linestyle=source_styles[source],
+            marker="o",
+            markersize=3.5,
+            color=target_colors[target],
+            alpha=0.9,
+            label=f"nguồn {source} → đích {target}",
+        )
+    reg = summary[summary["kind"] == "regular"].sort_values("bridge")
+    if not reg.empty:
+        ax.plot(reg["bridge"], reg["t_first_median"], "k-", marker="s", markersize=3.5,
+                linewidth=2, label="đối chứng: đều bậc 6")
+    ax.set_xscale("log", base=2)
+    ax.set_yscale("log")
+    ax.set_xlabel("độ rộng cầu (số cạnh)")
+    ax.set_ylabel("trung vị `t_first` (bước)")
+    ax.set_title("(a) Vị trí đầu cầu: màu = phía đích, nét = phía nguồn", fontsize=9)
+    ax.legend(fontsize=5.8, ncol=2)
+    ax.grid(alpha=0.3, which="both")
+
+    for ax, (key, label, title) in zip(
+        axes[1:],
+        [
+            ("inv_end_target", r"$\sum 1/\deg$(đầu cầu phía đích)", "(b) theo bậc của đầu cầu đích"),
+            ("phi_deg_room", "cầu / bậc trung bình của buồng đích", "(c) theo bậc trung bình buồng"),
+        ],
+    ):
+        for kind, marker in (("ba", "o"), ("regular", "s")):
+            for target, color in target_colors.items():
+                sub = summary[(summary["kind"] == kind) & (summary["target"] == target)]
+                sub = sub[np.isfinite(sub["t_first_median"])]
+                if sub.empty:
+                    continue
+                ax.scatter(sub[key], sub["t_first_median"], marker=marker, color=color,
+                           s=26, alpha=0.8, edgecolor="black", linewidth=0.3)
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+        ax.set_xlabel(label)
+        ax.set_title(title, fontsize=9)
+        ax.xaxis.set_minor_formatter(NullFormatter())
+        ax.grid(alpha=0.3, which="both")
+    fig.tight_layout()
+    return _save(fig, out_dir, "fig7_two_room_hetero")

@@ -21,6 +21,7 @@ __all__ = [
     "degree_stats",
     "average_path_length",
     "two_room_graph",
+    "two_room_hetero",
     "relaxation_time",
 ]
 
@@ -157,6 +158,72 @@ def _two_sparse_rooms(
     row = np.concatenate(rows)
     col = np.concatenate(cols)
     return sparse.csr_matrix((np.ones(row.size), (row, col)), shape=(n1 + n2, n1 + n2))
+
+
+PLACEMENTS = ("random", "hub", "leaf")
+
+
+def _pick_endpoints(
+    degrees: np.ndarray, k: int, mode: str, rng: np.random.Generator
+) -> np.ndarray:
+    """Choose ``k`` distinct bridge endpoints in one room by degree rank.
+
+    ``hub`` takes the highest-degree nodes, ``leaf`` the lowest, and
+    ``random`` a uniform sample. Ties are broken at random.
+    """
+    if mode not in PLACEMENTS:
+        raise ValueError(f"placement must be one of {PLACEMENTS}, got {mode!r}")
+    if mode == "random":
+        return rng.choice(degrees.size, size=k, replace=False)
+    tie = rng.random(degrees.size)
+    order = np.lexsort((tie, -degrees if mode == "hub" else degrees))
+    return order[:k]
+
+
+def two_room_hetero(
+    n: int,
+    bridge: int = 3,
+    seed: int | None = None,
+    kind: str = "ba",
+    m: int = 3,
+    source: str = "random",
+    target: str = "random",
+) -> sparse.csr_matrix:
+    """Two rooms with uneven degrees and controllable bridge endpoints.
+
+    ``kind="ba"`` builds each room as a Barabasi-Albert graph (mean degree
+    about ``2m``, a few hubs); ``kind="regular"`` builds a ``2m``-regular
+    graph with the same mean degree as a control. ``source`` and ``target``
+    choose whether the bridge touches hubs, leaves or random nodes of each
+    room. Room 0 is the source (nodes ``[0, n // 2)``).
+    """
+    if kind not in ("ba", "regular"):
+        raise ValueError("kind must be 'ba' or 'regular'")
+    rng = np.random.default_rng(seed)
+    half = n // 2
+    sizes = (half, n - half)
+    rows: list[np.ndarray] = []
+    cols: list[np.ndarray] = []
+    room_degrees: list[np.ndarray] = []
+    for offset, size in zip((0, half), sizes):
+        sub_seed = int(rng.integers(2**31 - 1))
+        if kind == "ba":
+            room = nx.barabasi_albert_graph(size, m, seed=sub_seed)
+        else:
+            room = nx.random_regular_graph(2 * m, size, seed=sub_seed)
+        edges = np.array(room.edges(), dtype=int) + offset
+        rows.extend([edges[:, 0], edges[:, 1]])
+        cols.extend([edges[:, 1], edges[:, 0]])
+        room_degrees.append(np.array([room.degree(i) for i in range(size)]))
+
+    k = min(bridge, *sizes)
+    src = _pick_endpoints(room_degrees[0], k, source, rng)
+    tgt = _pick_endpoints(room_degrees[1], k, target, rng) + half
+    rows.extend([src, tgt])
+    cols.extend([tgt, src])
+    row = np.concatenate(rows)
+    col = np.concatenate(cols)
+    return sparse.csr_matrix((np.ones(row.size), (row, col)), shape=(n, n))
 
 
 def relaxation_time(adj: sparse.spmatrix) -> tuple[float, float]:
