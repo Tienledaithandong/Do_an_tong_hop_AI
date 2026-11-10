@@ -2,7 +2,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from hive.analysis import hierarchical_bootstrap_law, law_diagnostics, law_frame
+from hive.analysis import (
+    hierarchical_bootstrap_law,
+    law_diagnostics,
+    law_frame,
+    leave_one_family_out,
+)
 from hive.plots import fit_law
 
 
@@ -65,6 +70,7 @@ def _seeds_frame(noise: float = 0.0, seed: int = 0) -> pd.DataFrame:
                         "graph_seed": graph,
                         "path_length": L,
                         "t90": 10.0 + 5.0 * L + offset + rng.normal(0.0, noise),
+                        "t90_hit": True,
                     }
                 )
     return pd.DataFrame(rows)
@@ -95,3 +101,45 @@ def test_hierarchical_bootstrap_needs_at_least_three_configs():
     law = hierarchical_bootstrap_law(frame[frame["config"].isin(["c1", "c2"])])
     assert law["n_configs"] == 2
     assert "error" in law
+
+
+def test_hierarchical_bootstrap_ignores_censored_sentinels_inside_resamples():
+    # Two hit seeds at the true value plus two censored sentinels per graph:
+    # a raw median would be dragged to (v+999)/2, the hit-only median stays v.
+    rows = []
+    for L in (1.0, 2.0, 3.0, 4.0):
+        for graph in range(2):
+            v = 10.0 + 5.0 * L
+            for t90, hit in ((v, True), (v, True), (999.0, False), (999.0, False)):
+                rows.append(
+                    {
+                        "config": f"c{L:g}",
+                        "graph_seed": graph,
+                        "path_length": L,
+                        "t90": t90,
+                        "t90_hit": hit,
+                    }
+                )
+    law = hierarchical_bootstrap_law(pd.DataFrame(rows), n_boot=100)
+    assert law["slope"] == pytest.approx(5.0)
+    assert law["intercept"] == pytest.approx(10.0)
+    np.testing.assert_allclose(law["ci"]["slope"], [5.0, 5.0])
+    # Resamples that draw only censored seeds are skipped, not averaged in.
+    assert 0 < law["n_boot_used"] <= 100
+
+
+def test_leave_one_family_out_refits_without_each_family():
+    train = law_frame(_summary())
+    rows = leave_one_family_out(train)
+    assert {r["dropped"] for r in rows} == {"complete", "rgg", "ws"}
+    for r in rows:
+        assert r["n"] == len(train) - int((train["family"] == r["dropped"]).sum())
+        assert np.isfinite(r["slope"]) and np.isfinite(r["r2"])
+    by_family = {r["dropped"]: r for r in rows}
+    # Dropping WS removes the long-lattice leverage point, so the slope moves.
+    assert by_family["ws"]["slope"] != pytest.approx(by_family["rgg"]["slope"])
+
+
+def test_diagnostics_expose_leave_one_family():
+    diag = law_diagnostics(_summary(), n_boot=100)
+    assert {r["dropped"] for r in diag["leave_one_family"]} == {"complete", "rgg", "ws"}

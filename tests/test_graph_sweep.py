@@ -61,3 +61,16 @@ def test_mrd_reference_uses_the_clipped_reward_expectation():
     raw = reference_mrd(q, 40, delta=0.0)
     assert np.allclose(res["mrd"], clipped, atol=1e-12)
     assert not np.allclose(clipped, raw, atol=1e-3)
+
+
+def test_seed_offset_shifts_the_rng_without_changing_determinism():
+    adj = complete_graph_adj(30)
+    q = make_q("middle")
+    a = simulate_on_graph(adj, q, steps=20, seeds=3, n_types=10, seed_offset=0)
+    b = simulate_on_graph(adj, q, steps=20, seeds=3, n_types=10, seed_offset=0)
+    c = simulate_on_graph(adj, q, steps=20, seeds=3, n_types=10, seed_offset=100)
+    np.testing.assert_allclose(a["curves"], b["curves"])
+    assert not np.allclose(a["curves"], c["curves"])
+    # offset=1, seed 0 is the same RNG stream as offset=0, seed 1.
+    d = simulate_on_graph(adj, q, steps=20, seeds=1, n_types=10, seed_offset=1)
+    np.testing.assert_allclose(d["curves"][0], a["curves"][1])

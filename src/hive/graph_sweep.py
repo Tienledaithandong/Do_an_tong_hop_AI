@@ -109,13 +109,16 @@ def simulate_on_graph(
     mode: str = "graph",
     progress: Callable[[int, int], None] | None = None,
     return_state: bool = False,
+    seed_offset: int = 0,
 ) -> dict[str, np.ndarray]:
     """Run the weighted voter on a fixed topology and summarise every seed.
 
     ``progress`` is called as ``progress(completed_seeds, total_seeds)`` after
     each seed, which lets a UI report progress without changing the numerics.
     ``return_state`` adds the final type vector of the last seed under
-    ``"final_types"``, used for visualisation only.
+    ``"final_types"``, used for visualisation only. ``seed_offset`` shifts the
+    per-seed RNG seeds so separate calls (e.g. different graph draws) produce
+    independent trajectories instead of reusing seeds ``0..seeds-1``.
     """
     q = np.asarray(q, dtype=float)
     n = int(q.size) if n_types is None else n_types
@@ -132,7 +135,7 @@ def simulate_on_graph(
     tail = max(1, steps // 10)
 
     for seed in range(seeds):
-        rng = np.random.default_rng(seed)
+        rng = np.random.default_rng(seed_offset + seed)
         bandit = Bandit(q, delta=delta, rng=rng)
         types = _initial_types(rng, n, N)
         mrd_curves[seed] = reference_mrd(

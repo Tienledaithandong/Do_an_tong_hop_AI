@@ -107,21 +107,29 @@ def bootstrap_law(
 
 
 def _collapse_graphs(
-    graphs: list[tuple[float, np.ndarray]], rng: np.random.Generator | None = None
+    graphs: list[tuple[float, np.ndarray, np.ndarray]],
+    rng: np.random.Generator | None = None,
 ) -> tuple[float, float]:
     """One (L, t90) point from a config's graphs: mean L, mean of per-graph medians.
 
-    With ``rng`` the seeds inside each graph are resampled first, so the
-    statistic carries both graph-level and seed-level sampling noise.
+    Each graph is ``(L, t90, hit)``. The per-graph median is taken over the
+    *hit* seeds only, so a censoring sentinel never enters as an observed time.
+    With ``rng`` the (t90, hit) pairs inside each graph are resampled together
+    first, so censoring is handled inside every bootstrap replicate; a resample
+    with no hit seeds contributes no median and is left out of that replicate's
+    config mean (NaN if the whole config has none).
     """
     ls: list[float] = []
     ts: list[float] = []
-    for length, t90s in graphs:
+    for length, t90s, hits in graphs:
         if rng is not None:
-            t90s = t90s[rng.integers(0, t90s.size, t90s.size)]
+            idx = rng.integers(0, t90s.size, t90s.size)
+            t90s, hits = t90s[idx], hits[idx]
+        reached = t90s[hits]
         ls.append(length)
-        ts.append(float(np.median(t90s)))
-    return float(np.mean(ls)), float(np.mean(ts))
+        ts.append(float(np.median(reached)) if reached.size else float("nan"))
+    finite = [t for t in ts if np.isfinite(t)]
+    return float(np.mean(ls)), float(np.mean(finite)) if finite else float("nan")
 
 
 def hierarchical_bootstrap_law(
@@ -130,19 +138,28 @@ def hierarchical_bootstrap_law(
     """Cluster bootstrap for the ``t90 ~ L`` law over graphs then seeds.
 
     ``seeds`` has one row per (config, graph, swarm seed) with columns
-    ``config``, ``graph_seed``, ``path_length`` and ``t90``. The point estimate
-    collapses each config to one (mean L, mean per-graph median t90) point and
-    fits OLS. Each bootstrap replicate resamples graphs with replacement within
-    every config and seeds with replacement within each drawn graph, then
-    refits, so the CI reflects both levels of variation instead of only the
-    swarm-seed noise of a single fixed graph.
+    ``config``, ``graph_seed``, ``path_length``, ``t90`` and ``t90_hit``. The
+    point estimate collapses each config to one (mean L, mean per-graph
+    hit-only median t90) point and fits OLS. Each bootstrap replicate resamples
+    graphs with replacement within every config and (t90, hit) pairs within each
+    drawn graph, then refits, so the CI reflects both levels of variation and
+    censoring is handled inside each resample. Replicates whose resamples leave
+    a config with no hit seeds are skipped rather than averaged with sentinels.
+
+    Note this CI conditions on the *fixed* set of configurations: it does not
+    reflect sensitivity to adding/removing configs or graph families (see
+    ``leave_one_family_out`` and the config-level ``bootstrap_law`` for that).
     """
-    groups: dict[str, list[tuple[float, np.ndarray]]] = {}
+    groups: dict[str, list[tuple[float, np.ndarray, np.ndarray]]] = {}
     for config, cdf in seeds.groupby("config", sort=True):
-        graphs: list[tuple[float, np.ndarray]] = []
+        graphs: list[tuple[float, np.ndarray, np.ndarray]] = []
         for _, gdf in cdf.groupby("graph_seed", sort=True):
             graphs.append(
-                (float(gdf["path_length"].iloc[0]), _as_float(gdf["t90"]))
+                (
+                    float(gdf["path_length"].iloc[0]),
+                    _as_float(gdf["t90"]),
+                    gdf["t90_hit"].to_numpy(dtype=bool),
+                )
             )
         groups[str(config)] = graphs
     configs = list(groups)
@@ -154,11 +171,11 @@ def hierarchical_bootstrap_law(
     intercept, slope, r2 = _fit_line(x, y)
 
     rng = np.random.default_rng(seed)
-    intercepts = np.empty(n_boot)
-    slopes = np.empty(n_boot)
-    r2s = np.empty(n_boot)
-    predictions = np.empty(n_boot)
-    for b in range(n_boot):
+    intercepts: list[float] = []
+    slopes: list[float] = []
+    r2s: list[float] = []
+    predictions: list[float] = []
+    for _ in range(n_boot):
         xb = np.empty(len(configs))
         yb = np.empty(len(configs))
         for j, c in enumerate(configs):
@@ -166,17 +183,22 @@ def hierarchical_bootstrap_law(
             g = len(graphs)
             drawn = [graphs[i] for i in rng.integers(0, g, g)]
             xb[j], yb[j] = _collapse_graphs(drawn, rng)
+        if not (np.all(np.isfinite(xb)) and np.all(np.isfinite(yb))):
+            continue
         i_b, s_b, r_b = _fit_line(xb, yb)
-        intercepts[b] = i_b
-        slopes[b] = s_b
-        r2s[b] = r_b
-        predictions[b] = i_b + s_b * L_REF
+        intercepts.append(i_b)
+        slopes.append(s_b)
+        r2s.append(r_b)
+        predictions.append(i_b + s_b * L_REF)
+    if not slopes:
+        return {"n_configs": len(configs), "error": "không mẫu bootstrap nào đủ seed đạt"}
 
     q = lambda draws: [float(np.percentile(draws, 2.5)), float(np.percentile(draws, 97.5))]
     return {
         "n_configs": len(configs),
         "n_graphs": int(sum(len(g) for g in groups.values())),
         "n_seeds": int(len(seeds)),
+        "n_boot_used": len(slopes),
         "intercept": float(intercept),
         "slope": float(slope),
         "r2": float(r2),
@@ -249,6 +271,33 @@ def leave_one_out(train: pd.DataFrame) -> dict[str, Any]:
         "prediction_at_L2_min": float(np.nanmin(predictions)),
         "prediction_at_L2_max": float(np.nanmax(predictions)),
     }
+
+
+def leave_one_family_out(train: pd.DataFrame) -> list[dict[str, Any]]:
+    """Refit the law after dropping each graph family in turn.
+
+    The hierarchical bootstrap conditions on the fixed config set, so it cannot
+    show how much the slope depends on *which* families are present. This
+    sensitivity fills that gap: a large swing when one family is removed means
+    the headline slope is partly a between-family contrast, not a within-family
+    law.
+    """
+    out: list[dict[str, Any]] = []
+    for family in sorted(train["family"].unique()):
+        sub = train[train["family"] != family]
+        x = _as_float(sub["path_length"])
+        y = _as_float(sub["t90"])
+        intercept, slope, r2 = _fit_line(x, y)
+        out.append(
+            {
+                "dropped": str(family),
+                "n": int(x.size),
+                "intercept": float(intercept),
+                "slope": float(slope),
+                "r2": float(r2),
+            }
+        )
+    return out
 
 
 def family_effect(train: pd.DataFrame) -> dict[str, Any]:
@@ -333,6 +382,7 @@ def law_diagnostics(
     boot = bootstrap_law(train, n_boot=n_boot, seed=seed)
     infl = influence(train)
     loo = leave_one_out(train)
+    lof = leave_one_family_out(train)
     family = family_effect(train)
     degree = degree_models(train)
     corr = correlations(train)
@@ -349,6 +399,14 @@ def law_diagnostics(
             warnings.append(
                 "Bỏ một cấu hình làm hệ số góc đổi "
                 f"{100 * ratio:.0f}% — quy luật chưa ổn định."
+            )
+    fam_slopes = [r["slope"] for r in lof if np.isfinite(r["slope"])]
+    if fam_slopes and slope:
+        swing = (max(fam_slopes) - min(fam_slopes)) / abs(slope)
+        if swing > 0.5:
+            warnings.append(
+                "Bỏ một họ đồ thị làm hệ số góc đổi "
+                f"{100 * swing:.0f}% — độ dốc phụ thuộc tập họ đang có."
             )
     if family and np.isfinite(family["ws_offset_p"]) and family["ws_offset_p"] < 0.05:
         warnings.append(
@@ -378,6 +436,7 @@ def law_diagnostics(
         "prediction_at_L2": float(intercept + slope * L_REF),
         "ci": boot,
         "leave_one_out": loo,
+        "leave_one_family": lof,
         "influence": infl,
         "family_effect": family,
         "degree_models": degree,

@@ -54,9 +54,13 @@ python scripts/check_two_room.py      # ~30 s; ghi results/two_room_source*.csv 
 python scripts/analyze_law.py         # ghi results/law_diagnostics.json
 ```
 
-Hiệu chuẩn quy luật `t90 ~ L` trên nhiều graph seed (10 graph × 30 seed mỗi
-cấu hình trong 16 cấu hình), kèm bootstrap phân tầng resample graph trong
-cấu hình rồi seed trong graph để CI phản ánh cả biến thiên giữa các graph:
+Hiệu chuẩn quy luật `t90 ~ L` trên nhiều graph seed: **142 graph riêng biệt**
+(10 graph × 30 seed mỗi cấu hình; riêng complete và WS `p = 0` là topology tất
+định nên chạy 1 graph × 300 seed), tổng **4.800 lần chạy** với seed độc lập theo
+từng (cấu hình, graph). Bootstrap phân tầng resample graph trong cấu hình rồi
+cặp `(t90, hit)` trong mỗi graph — censoring được xử lý ngay trong từng resample —
+để CI phản ánh cả biến thiên giữa các graph. CI này **điều kiện hoá trên tập cấu
+hình cố định**; độ nhạy theo họ đồ thị xem `leave_one_family_out`:
 
 ```bash
 python scripts/check_graph_seeds.py          # ~15–20 phút; Hình 8
@@ -159,7 +163,8 @@ kiểm tra:
   gốc, nhân quả/thô định vị đúng thời điểm xuất hiện, nhân quả không dùng dữ
   liệu tương lai, và mọi định nghĩa đều trả censoring khi không đạt ngưỡng;
 - bootstrap phân tầng: khôi phục đúng đường thẳng khi dữ liệu tuyến tính chính
-  xác, CI hữu hạn và có thứ tự khi nhiễu, và yêu tối thiểu 3 cấu hình;
+  xác, CI hữu hạn và có thứ tự khi nhiễu, xử lý censoring trong từng resample,
+  và yêu tối thiểu 3 cấu hình; leave-one-family và `seed_offset` độc lập;
 - vòng đời job của web API (tạo, chạy, lấy kết quả, trả PNG);
 - validation đầu vào (N, bước, seed, họ đồ thị, tham số) và phục vụ UI tĩnh;
 - endpoint `/api/results`, `/api/law` và chặn tên tệp ngoài danh sách cho phép.
@@ -233,8 +238,11 @@ report/            report.md (nguồn) và report.pdf (tự động sinh)
   so sánh được giữa các cấu hình có tỉ lệ đạt khác nhau. Bị chặn trên bởi
   trần mô phỏng khi phần lớn seed không đạt ngưỡng.
 - `check_graph_seeds.py` dùng bootstrap phân tầng (resample graph trong cấu
-  hình, rồi seed trong graph) để CI của độ dốc phản ánh cả biến thiên giữa
-  các graph, không chỉ nhiễu seed trên một graph cố định như `analyze_law.py`.
+  hình, rồi cặp `(t90, hit)` trong graph) để CI của độ dốc phản ánh cả biến thiên
+  giữa các graph, không chỉ nhiễu seed trên một graph cố định như `analyze_law.py`.
+  Censoring được xử lý trong từng resample; seed độc lập theo (cấu hình, graph);
+  topology tất định (complete, WS `p = 0`) tính là một graph. CI điều kiện hoá
+  trên tập cấu hình cố định — độ nhạy theo họ xem `leave_one_family_out`.
 - `relaxation_time` dùng nhánh dense cho `n <= 512` và `eigsh(which="LA")`
   cho `n > 512`, nên trả về `λ₂` đại số (không phải `-1`) cả với đồ thị
   bipartite. `τ` là spectral gap (lazy walk trộn trong khoảng `2τ`), không

@@ -4,8 +4,14 @@ The headline law was fit on a single graph per configuration (seed=0), so its
 bootstrap CI only captured swarm-seed noise on that one graph. This sweep
 redraws ``graph_seeds`` graphs per configuration and runs ``seeds`` swarm seeds
 on each, then reports a hierarchical bootstrap CI that resamples graphs within
-config and seeds within graph. RGG draws are rejection-conditioned on
+config and (t90, hit) pairs within graph. RGG draws are rejection-conditioned on
 connectivity so every calibration point is a connected graph.
+
+Swarm seeds are offset per (config, graph) so every trajectory is independent
+(review #4). Deterministic topologies (complete, WS p=0) are run as a single
+graph with ``graph_seeds * seeds`` seeds rather than counted as multiple
+independent graphs, so the reported graph count is the number of *distinct*
+topologies while the run count stays the total number of trajectories.
 
 Usage:
     python scripts/check_graph_seeds.py
@@ -87,11 +93,18 @@ def main() -> None:
     graph_rows: list[dict] = []
     t90_bank: dict[str, np.ndarray] = {}
     specs = build_configs(cfg)
+    seed_offset = 0
     for family, param, mode in specs:
         config = f"{family}:{param:g}"
-        for graph_seed in range(G):
+        # Complete and WS p=0 are deterministic: redrawing them yields the same
+        # graph, so G replicas are NOT G independent graphs. Run one draw with
+        # G*S independent seeds instead and count it as a single graph.
+        deterministic = family == "complete" or (family == "ws" and param == 0.0)
+        G_eff = 1 if deterministic else G
+        S_eff = G * S if deterministic else S
+        for graph_seed in range(G_eff):
             if family == "complete":
-                adj, draw_seed = dens, graph_seed
+                adj, draw_seed = dens, 0
             elif family == "ws":
                 adj, draw_seed = ws_graph(N, 6, param, seed=graph_seed), graph_seed
             else:
@@ -100,12 +113,14 @@ def main() -> None:
             stats = degree_stats(adj)
             length = average_path_length(adj)
             res = simulate_on_graph(
-                adj, q, steps=steps, seeds=S, delta=0.1, n_types=n, mode=mode
+                adj, q, steps=steps, seeds=S_eff, delta=0.1, n_types=n, mode=mode,
+                seed_offset=seed_offset,
             )
             t90s = res["t90"]
             hits = res["hit"]
             t90_bank[f"{config}:{graph_seed}"] = t90s
             hit_rate = float(hits.mean())
+            reached = t90s[hits]
             graph_rows.append(
                 {
                     "config": config,
@@ -113,31 +128,34 @@ def main() -> None:
                     "param": param,
                     "graph_seed": graph_seed,
                     "draw_seed": draw_seed,
+                    "deterministic": deterministic,
                     "N": N,
+                    "n_seeds": S_eff,
                     "path_length": length,
                     "tau": tau,
                     "lambda2": lambda2,
                     "degree_mean": stats["mean"],
                     "degree_cv": stats["cv"],
-                    "t90_median": float(np.median(t90s)),
+                    "t90_median": float(np.median(reached)) if reached.size else float("nan"),
                     "hit_rate": hit_rate,
                     "rmst": rmst(t90s, hits, steps),
                 }
             )
-            for seed in range(S):
+            for i in range(S_eff):
                 rows.append(
                     {
                         "config": config,
                         "family": family,
                         "param": param,
                         "graph_seed": graph_seed,
-                        "seed": seed,
+                        "seed": seed_offset + i,
                         "path_length": length,
                         "tau": tau,
-                        "t90": float(t90s[seed]),
-                        "t90_hit": bool(hits[seed]),
+                        "t90": float(t90s[i]),
+                        "t90_hit": bool(hits[i]),
                     }
                 )
+            seed_offset += S_eff
         print(f"  {config:16s} done ({time.time() - started:.0f}s)", flush=True)
 
     seeds_df = pd.DataFrame(rows)
@@ -159,7 +177,12 @@ def main() -> None:
         json.dump(law, fh, ensure_ascii=False, indent=2)
 
     paths = plot_graph_seeds(graphs_df, law, FIGURES, suffix=suffix)
-    print(f"[graph-seeds] {time.time() - started:.1f}s, {len(graphs_df)} graphs, {len(seeds_df)} runs")
+    n_det = int(graphs_df["deterministic"].sum())
+    print(
+        f"[graph-seeds] {time.time() - started:.1f}s, "
+        f"{len(graphs_df)} distinct graphs ({n_det} deterministic), "
+        f"{len(seeds_df)} independent runs"
+    )
     if "slope" in law:
         ci = law["ci"]["slope"]
         print(
