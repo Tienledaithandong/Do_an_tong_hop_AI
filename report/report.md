@@ -123,6 +123,7 @@ Mỗi cấu hình dùng **một đồ thị cố định** (seed 0) và 100 seed
 - `final_best_mass`: trung bình tỉ lệ chọn phương án tốt nhất trong 10% bước cuối.
 - `consensus`: khối lượng của phương án phổ biến nhất ở bước cuối.
 - `l2_mrd`: khoảng cách RMS giữa đường học thực nghiệm và đường MRD.
+- `RMST` (restricted mean survival time): diện tích dưới đường sống sót Kaplan–Meier của thời gian đạt ngưỡng, tính tới trần `T` bước. Mỗi seed bị censored đóng góp trọn thời gian quan sát được thay vì bị loại, nên RMST so sánh được giữa các cấu hình có tỉ lệ đạt ngưỡng khác nhau — khác với trung vị có điều kiện chỉ mô tả nhóm seed nhanh. Cài đặt trong `src/hive/metrics.py` (`kaplan_meier`, `rmst`).
 
 ## 4. Kết quả tái tạo
 
@@ -209,6 +210,17 @@ Ba dòng cuối Bảng 1 được thiết kế để tách `τ` khỏi `L`: hai 
 
 `t₅₀` và `t₉₀*` là trung vị **có điều kiện** trên các seed không bị censored trong 600 bước; cột "seed đạt" là tỉ lệ seed thực sự vượt ngưỡng. Với cầu 1, 73% seed không bao giờ đạt 0,5, nên `t₅₀ = 425,5` chỉ mô tả nhóm seed nhanh nhất và là một cận dưới. Trung vị `t₉₀` trên toàn bộ seed (censored tính bằng 601) là 601 cho cầu 1 và 172,5 cho cầu 12.
 
+Vì trung vị có điều kiện loại bỏ phần lớn seed ở cầu hẹp, Bảng 1b đọc kèm một thống kê sống sót có tính đến censoring: **RMST** tới trần 600 bước (Bảng 1b′). RMST₅₀ giảm đơn điệu từ **550,6** (cầu 1) xuống **185,8** (cầu 12); RMST₉₀ giảm từ **559,5** xuống **227,7**. Ở cầu 1, RMST₅₀ = 550,6 sát trần 600 vì phần lớn seed không bao giờ đạt 0,5 — đúng bức tranh mà trung vị có điều kiện 425,5 che mất. Quan trọng hơn, RMST so sánh được giữa các cầu dù tỉ lệ đạt khác nhau (0,27 so với 0,93), nên xác nhận hiệu ứng dung lượng cầu trên một thống kê không bị lệch bởi censoring.
+
+**Bảng 1b′. RMST thời gian đạt ngưỡng trong buồng đích (trần 600 bước).**
+
+| Cầu | RMST₅₀ | RMST₉₀ |
+|---|---|---|
+| 1 | 550,6 | 559,5 |
+| 3 | 392,1 | 418,4 |
+| 6 | 268,5 | 301,4 |
+| 12 | 185,8 | 227,7 |
+
 ![Hình 4. Gieo type tốt vào buồng nguồn. (a) Tỉ lệ chọn type tốt trong buồng đích theo thời gian. (b) Trung vị thời gian đạt 50% và 90% trong buồng đích theo độ rộng cầu, kèm CI 95% bootstrap.](figures/fig4_two_room_source.png)
 
 **Kết quả.** Trong dải `L = 1,93–1,997` — biến thiên chưa tới 4% — `t₅₀` giảm từ 425,5 xuống 132,5 bước, hơn **3,2 lần**, và tỉ lệ seed đạt 50% tăng từ 0,27 lên 0,93. Tỉ lệ seed kết thúc với khối lượng type tốt ≥ 0,95 tăng từ 0,17 lên 0,93. Vì `L` gần như không đổi, thay đổi này **không thể quy cho khoảng cách**: nó do dung lượng của cầu, tức số cạnh nối hai buồng quyết định tốc độ dòng thông tin qua lát cắt. Đây là kênh thứ hai mà một thang đo đơn lẻ như `L` bỏ sót.
@@ -230,6 +242,18 @@ Tóm lại, trên WS và RGG — nơi bậc thay đổi vừa phải và không 
 **Bậc và hình dạng bậc.** Bậc trung bình tương quan hạng âm với `t₉₀` (Spearman −0,70, `p = 0,0025`) và degree CV tương quan Pearson −0,64 (`p = 0,007`). Thêm `log(bậc)` vào mô hình `L` tăng `R²` thêm 1,4 điểm phần trăm; thêm degree CV tăng 2,3; thêm cả hai tăng **5,1** (từ 0,910 lên 0,962). Vì vậy `L` chưa được tách khỏi bậc: các đồ thị có `L` lớn cũng là các đồ thị thưa với bậc thấp, và mô hình hiện tại không phân biệt được hai cách giải thích. Đây là lý do §5.4 kiểm tra thêm mạng đuôi nặng.
 
 Các chẩn đoán này không phủ nhận quy luật; chúng xác định phạm vi đọc nó. `L` giải thích phần lớn biến thiên trong mẫu, nhưng độ dốc bất định, có hiệu ứng họ, và chưa tách khỏi bậc. Nên phát biểu là **"trong các họ WS và RGG đã khảo sát, `t₉₀` tăng xấp xỉ tuyến tính theo `L`"**, không phải "thời gian học bằng một hằng số nhân với `L` trên mọi đồ thị".
+
+**Hiệu chuẩn lại trên nhiều graph seed.** Khoảng 3,04–6,67 ở trên bootstrap trên 16 điểm cấu hình mà mỗi điểm là *một* graph (seed = 0), nên nó trộn nhiễu swarm-seed với sự thất thường của một lần vẽ graph. Để tách hai nguồn, `scripts/check_graph_seeds.py` vẽ lại 10 graph cho mỗi cấu hình (RGG được điều kiện hoá liên thông) và chạy 30 seed trên mỗi graph — 160 graph, 4.800 lần chạy — rồi bootstrap phân tầng: resample graph trong cấu hình, sau đó resample seed trong mỗi graph được chọn (`src/hive/analysis.py`, kết quả `results/graph_seeds_law.json`). Kết quả ở Hình 8:
+
+```
+t₉₀ = 44,61 + 3,81 · L,     R² = 0,95
+```
+
+CI 95% của độ dốc là **3,40–4,33**, hẹp hơn hẳn khoảng 3,04–6,67 của bản một graph; CI tung độ gốc 42,1–47,4 và dự đoán tại `L = 2` là 52,2 (50,8–54,3). Độ dốc nhích lên 3,81 và `R²` tăng từ 0,91 lên 0,95 vì mỗi cấu hình giờ là trung bình của 10 graph thay vì một lần vẽ. Biến thiên graph-to-graph đo được lớn nhất ở WS thưa (`p = 10⁻³`: `L` có SD 6,6, `t₉₀` SD 17,6 bước) và nhỏ ở RGG / WS dày (`t₉₀` SD 3–6 bước); trung bình hoá 10 graph triệt phần nhiễu idiosyncratic đó. Nói cách khác, khoảng rộng cũ phần lớn là artefact của việc hiệu chuẩn trên một graph đơn, không phải bất định nội tại của quy luật.
+
+![Hình 8. Quy luật L hiệu chuẩn trên 10 graph seed mỗi cấu hình; thanh ngang/dọc là SD giữa các graph. Đường thẳng và CI từ bootstrap phân tầng.](figures/fig8_graph_seeds.png)
+
+Hai chẩn đoán vẫn còn sau khi siết CI: vòng lattice `WS p = 0` (`L = 42`) vẫn nằm ngoài dải và đòn bẩy cao, và hiệu ứng họ chưa mất — `WS p = 0,01` nằm trên đường hồi quy khoảng 27 bước. Bootstrap phân tầng làm độ dốc chính xác hơn nhưng không xoá hai giới hạn đó; chúng thuộc về dạng mô hình, không thuộc về cỡ mẫu.
 
 ### 5.4. Kiểm tra ngoài phạm vi: mạng đuôi nặng
 
@@ -369,19 +393,19 @@ Ba thí nghiệm khớp với bức tranh hai kênh. Đồ thị đầy đủ v�
 
 ## 7. Hạn chế
 
-1. **Censoring.** Hai cấu hình chậm nhất của Bảng 1 có 4–10% seed không đạt 0,9 trong 400 bước. Ở thí nghiệm gieo nguồn, censoring nặng hơn nhiều: với cầu 1, 73% seed không đạt 0,5 trong 600 bước, nên các trung vị `t₅₀`, `t₉₀` chỉ mô tả nhóm seed nhanh và phải đọc cùng tỉ lệ seed đạt. Đã báo cáo riêng tỉ lệ đạt thay vì che đi; `t₁₀` không dùng được vì nhiều cấu hình chạm trần 600 bước ngay từ ngưỡng 10%.
+1. **Censoring.** Hai cấu hình chậm nhất của Bảng 1 có 4–10% seed không đạt 0,9 trong 400 bước. Ở thí nghiệm gieo nguồn, censoring nặng hơn nhiều: với cầu 1, 73% seed không đạt 0,5 trong 600 bước, nên các trung vị `t₅₀`, `t₉₀` chỉ mô tả nhóm seed nhanh và phải đọc cùng tỉ lệ seed đạt. Đã báo cáo riêng tỉ lệ đạt thay vì che đi, và bổ sung RMST (Bảng 1b′) — thống kê sống sót tính trọn thời gian quan sát của seed bị censored để so sánh được giữa các cầu; `t₁₀` không dùng được vì nhiều cấu hình chạm trần 600 bước ngay từ ngưỡng 10%. RMST vẫn bị chặn trên bởi trần mô phỏng: khi phần lớn seed không đạt ngưỡng, RMST tiến sát trần và chỉ là cận dưới của thời gian thật.
 2. **Cùng một kịch bản chất lượng.** Thí nghiệm đồ thị chỉ dùng `q ∈ [0,4; 0,7]`. Với dải chất lượng thấp hơn, nhiễu tương đối lớn hơn và đàn dễ kẹt ở phương án tầm trung.
 3. **Mạng bậc nặng đuôi mới chỉ khảo sát sơ bộ.** Mục 5.4 kiểm tra thêm ba mạng ngoài phạm vi quét chính (BA `m = 2`, BA `m = 5`, ER bậc 6) với 100 seed: quy luật `L` vẫn giữ, nhưng sai lệch so với đường hiệu chuẩn là −3,4…+1,0 bước và BA `m = 2` lệch **dương**, tức ba điểm chưa đủ để khẳng định quy luật phổ quát cho mọi mạng đuôi nặng. Cần quét có hệ thống theo hệ số biến thiên bậc để kết luận.
 4. **Không có cơ chế khám phá.** Như bài báo gốc, khi một phương án biến mất khỏi quần thể thì nó không thể quay lại. Trong môi trường thay đổi theo thời gian, đàn sẽ không thích nghi được.
 5. **`t₉₀` phụ thuộc ngưỡng và cửa sổ làm trơn.** Đã cố định 0,9 và 5 bước cho mọi cấu hình, nhưng các ngưỡng khác có thể cho hệ số hồi quy khác.
-6. **Quy luật `L` là xấp xỉ mô tả, không phải định luật.** CI 95% của độ dốc là 3,04–6,67; một điểm (`WS p = 0`) có Cook's D = 10 và leverage 0,73; có hiệu ứng họ +13,4 bước (`p = 0,039`); thêm bậc và degree CV giải thích thêm 5,1% phương sai. Nên đọc quy luật trong phạm vi WS/RGG đã khảo sát, không ngoại suy cho mọi đồ thị.
+6. **Quy luật `L` là xấp xỉ mô tả, không phải định luật.** CI 95% của độ dốc là 3,04–6,67 khi hiệu chuẩn trên một graph mỗi cấu hình, và siết lại còn 3,40–4,33 khi trung bình 10 graph với bootstrap phân tầng (§5.3); một điểm (`WS p = 0`) có Cook's D = 10 và leverage 0,73; có hiệu ứng họ +13,4 bước (`p = 0,039`); thêm bậc và degree CV giải thích thêm 5,1% phương sai. Nên đọc quy luật trong phạm vi WS/RGG đã khảo sát, không ngoại suy cho mọi đồ thị.
 7. **Thí nghiệm gieo nguồn.** Bản đầu (§5.2) là pilot: một đồ thị cho mỗi độ rộng cầu, `N = 300`, 30 seed. Bản nhân rộng (§5.5) dùng 4 đồ thị, `N ∈ {200, 400, 600}` và cầu 1–16, nên CI phản ánh biến thiên giữa đồ thị, nhưng chỉ 4 đồ thị mỗi ô và 15 trung vị cho mỗi phép khớp; ở cầu 1 khoảng 40% lần chạy bị censor nên trung vị `t₅₀` không đáng tin bằng các ô khác. Vẫn chưa đo trực tiếp thông lượng qua cầu hay vận tốc mặt trận. Với clique `τ` và độ dẫn cầu biến thiên cùng nhau (cả hai do độ rộng cầu quyết định), nên §5.5 chỉ chứng minh `L` không đủ; §5.6 tách được `τ` khỏi `φ` bằng buồng thưa, nhưng chỉ với hai bậc `d`, buồng đều ngẫu nhiên và 4 đồ thị mỗi ô, và `τ` tương quan mạnh với `cầu/bậc` (−0,96). Với `t₅₀` (không chỉ lần tới đầu tiên), không đại lượng nào tách ra được. §5.7 thêm buồng Barabási–Albert: lần tới đầu tiên phụ thuộc bậc của đầu cầu phía đích, nhưng chỉ với một `N = 400`, một giá trị `m = 3`, cầu ≤ 8 và 5 đồ thị mỗi ô; với `t₅₀` thì hiệu ứng của hub bị triệt tiêu (hub khó bị xâm nhập nhưng cũng khó bị chỉnh lại) và `τ` thắng. Cơ chế này mới được đo bằng số lần tới/mất, chưa đo xác suất trụ của từng lần.
 
 ## 8. Kết luận
 
 Đồ án tái tạo thành công kết quả cốt lõi của Soma và cộng sự: một đàn cá thể chỉ bắt chước lẫn nhau cho ra đường học trùng với một tác tử học tăng cường duy nhất, sai lệch dưới 0,02.
 
-Khi phá vỡ giả định trộn đều bằng cách đặt đàn lên đồ thị, kết quả cho thấy tốc độ học không thể gói gọn trong một thang đo duy nhất. Trên 16 cấu hình không can thiệp (đầy đủ, WS, RGG), `t₉₀ = 44,85 + 3,46·L` với `R² = 0,91`, nhưng độ dốc có CI 95% 3,04–6,67, tồn tại hiệu ứng họ +13,4 bước, và bậc giải thích thêm 5,1% phương sai. Quy luật này là **mô tả hữu ích**, không phải định luật phổ quát.
+Khi phá vỡ giả định trộn đều bằng cách đặt đàn lên đồ thị, kết quả cho thấy tốc độ học không thể gói gọn trong một thang đo duy nhất. Trên 16 cấu hình không can thiệp (đầy đủ, WS, RGG), `t₉₀ = 44,85 + 3,46·L` với `R² = 0,91`; hiệu chuẩn lại trên 10 graph mỗi cấu hình (160 graph, 4.800 lần chạy) cho `t₉₀ = 44,61 + 3,81·L`, `R² = 0,95`, với CI 95% của độ dốc 3,40–4,33 — hẹp hơn khoảng 3,04–6,67 của bản một graph, cho thấy khoảng rộng cũ phần lớn do nhiễu của một lần vẽ graph. Dù vậy vẫn tồn tại hiệu ứng họ +13,4 bước và bậc giải thích thêm 5,1% phương sai. Quy luật này là **mô tả hữu ích**, không phải định luật phổ quát.
 
 Quan trọng hơn, thiết kế hai buồng cũ không kiểm định được việc thông tin qua cầu: cả hai buồng đều đã chứa type tốt, nên `t₉₀ = 47,5` chỉ là học cục bộ. Khi gieo type tốt vào một buồng, ở `L ≈ 1,9–2,0`, `t₅₀` giảm từ 425,5 xuống 132,5 bước và tỉ lệ seed đạt 50% tăng từ 0,27 lên 0,93 chỉ nhờ tăng độ rộng cầu. Kết luận đúng là cấu trúc tác động qua **ít nhất hai kênh**: khoảng cách thông tin (được `L` đo) và dung lượng lát cắt (bị `L` bỏ qua). Một lý thuyết đầy đủ về học tập trên đồ thị cần cả hai, hoặc một đại lượng gộp như thời gian qua lát cắt hẹp nhất.
 

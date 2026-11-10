@@ -196,6 +196,59 @@ def plot_law(df: pd.DataFrame, out_dir: Path) -> list[Path]:
     return _save(fig, out_dir, "fig2_law")
 
 
+def plot_graph_seeds(
+    graphs: pd.DataFrame, law: dict, out_dir: Path, suffix: str = ""
+) -> list[Path]:
+    """Config-level law with graph-to-graph spread across redrawn graphs.
+
+    Each point averages the redrawn graphs of one configuration; the error
+    bars are the standard deviation across graphs, so the figure shows how
+    much of the scatter is topology sampling rather than swarm-seed noise.
+    """
+    usable = graphs[graphs["hit_rate"] >= 0.5]
+    agg = (
+        usable.groupby(["config", "family"])
+        .agg(
+            L=("path_length", "mean"),
+            L_sd=("path_length", "std"),
+            t=("t90_median", "mean"),
+            t_sd=("t90_median", "std"),
+        )
+        .reset_index()
+    )
+    agg[["L_sd", "t_sd"]] = agg[["L_sd", "t_sd"]].fillna(0.0)
+
+    fig, ax = plt.subplots(figsize=(7.0, 4.6))
+    labels = {"complete": "Đầy đủ", "ws": "WS", "rgg": "RGG"}
+    colors = {"complete": COLORS["well_mixed"], "ws": COLORS["ws"], "rgg": COLORS["rgg"]}
+    for family in ("complete", "ws", "rgg"):
+        sub = agg[agg["family"] == family]
+        if sub.empty:
+            continue
+        ax.errorbar(
+            sub["L"], sub["t"], xerr=sub["L_sd"], yerr=sub["t_sd"],
+            fmt="o", ms=5, color=colors[family], label=labels[family],
+            elinewidth=1.0, capsize=2, alpha=0.85,
+        )
+    if "slope" in law:
+        xs = np.linspace(0.0, agg["L"].max() * 1.05, 50)
+        ax.plot(xs, law["intercept"] + law["slope"] * xs, color="0.2", linewidth=1.2)
+        ci = law["ci"]["slope"]
+        ax.annotate(
+            " $t_{90}$ = %.2f + %.2f $\\cdot$ L\n $R^2$ = %.2f\n slope 95%% CI [%.2f, %.2f]"
+            % (law["intercept"], law["slope"], law["r2"], ci[0], ci[1]),
+            xy=(0.04, 0.72), xycoords="axes fraction", fontsize=9,
+        )
+    ax.set_ylim(0, None)
+    ax.set_xlabel(r"Đường đi trung bình  $L$  (trung bình $\pm$ SD qua các graph)")
+    ax.set_ylabel("Số bước đạt 90% (trung bình median mỗi graph)")
+    ax.set_title("Quy luật L hiệu chuẩn trên nhiều graph seed")
+    ax.legend(frameon=False, fontsize=8)
+    ax.grid(alpha=0.3)
+    fig.tight_layout()
+    return _save(fig, out_dir, f"fig8_graph_seeds{suffix}")
+
+
 def plot_trajectories(
     mean_curves: dict[str, np.ndarray], mrd: np.ndarray, out_dir: Path
 ) -> list[Path]:

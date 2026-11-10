@@ -27,6 +27,7 @@ from hive.bandit import make_q
 from hive.config import TWO_ROOM_SOURCE
 from hive.graph_sweep import simulate_two_room_source
 from hive.graphs import average_path_length, degree_stats, relaxation_time, two_room_graph
+from hive.metrics import rmst
 from hive.plots import plot_two_room_source
 
 RESULTS = ROOT / "results"
@@ -134,6 +135,12 @@ def main() -> None:
                 "t90_hi": t90_hi,
                 "hit50_rate": float(group["hit50_target"].mean()),
                 "hit90_rate": float(group["hit90_target"].mean()),
+                "rmst50_target": rmst(
+                    group["t50_target"], group["hit50_target"], args.steps
+                ),
+                "rmst90_target": rmst(
+                    group["t90_target"], group["hit90_target"], args.steps
+                ),
                 "final_target_median": float(group["final_target"].median()),
                 "final_target95": float((group["final_target"] >= 0.95).mean()),
                 "t90_overall_median": float(group["t90"].median()),
@@ -153,6 +160,8 @@ def main() -> None:
                 "hit50_rate",
                 "t90_median",
                 "hit90_rate",
+                "rmst50_target",
+                "rmst90_target",
                 "final_target_median",
             ]
         ].to_string(index=False, float_format=lambda x: f"{x:8.2f}")

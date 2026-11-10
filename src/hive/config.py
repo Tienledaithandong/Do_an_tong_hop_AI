@@ -51,6 +51,34 @@ HEAVY_TAIL: dict = {
     "slope": 3.46,
 }
 
+# Multi-graph-seed calibration (scripts/check_graph_seeds.py). The headline
+# law used one graph per config; this redraws ``graph_seeds`` graphs and runs
+# ``seeds`` swarm seeds on each, so a hierarchical bootstrap can separate
+# graph-to-graph variation from swarm-seed noise. WS p=1e-4 is dropped because
+# at N=500 it redraws the p=0 ring exactly.
+GRAPH_SEEDS: dict[str, dict] = {
+    "full": {
+        "N": 500,
+        "steps": 400,
+        "graph_seeds": 10,
+        "seeds": 30,
+        "n_types": 10,
+        "scenario": "middle",
+        "ws_p": [0.0, 1e-3, 0.01, 0.05, 0.1, 0.2, 0.4, 0.7, 1.0],
+        "rgg_c": [1.4, 1.6, 1.8, 2.0, 2.2, 2.5],
+    },
+    "quick": {
+        "N": 120,
+        "steps": 150,
+        "graph_seeds": 3,
+        "seeds": 6,
+        "n_types": 10,
+        "scenario": "middle",
+        "ws_p": [0.0, 0.1, 1.0],
+        "rgg_c": [1.6, 2.2],
+    },
+}
+
 # Source-room intervention: the best option starts in room A only, so the
 # bridge is the sole channel for it to reach room B. This is deliberately
 # different from the original sweep, where both rooms were already seeded.

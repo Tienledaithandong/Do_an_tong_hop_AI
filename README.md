@@ -50,8 +50,17 @@ Can thiệp gieo nguồn cho đồ thị hai buồng (Hình 4) và chẩn đoán
 quy luật `t90 ~ L`:
 
 ```bash
-python scripts/check_two_room.py      # ~30 s; ghi results/two_room_source*.csv
+python scripts/check_two_room.py      # ~30 s; ghi results/two_room_source*.csv (kèm RMST)
 python scripts/analyze_law.py         # ghi results/law_diagnostics.json
+```
+
+Hiệu chuẩn quy luật `t90 ~ L` trên nhiều graph seed (10 graph × 30 seed mỗi
+cấu hình trong 16 cấu hình), kèm bootstrap phân tầng resample graph trong
+cấu hình rồi seed trong graph để CI phản ánh cả biến thiên giữa các graph:
+
+```bash
+python scripts/check_graph_seeds.py          # ~15–20 phút; Hình 8
+python scripts/check_graph_seeds.py --quick  # vài giây
 ```
 
 Bản nhân rộng của thí nghiệm này (nhiều đồ thị, nhiều `N`, tách thời gian
@@ -134,6 +143,10 @@ kiểm tra:
 - thiết kế gieo nguồn hai buồng: type tốt không xuất hiện trong buồng đích;
 - chẩn đoán quy luật `t90 ~ L`: loại điểm can thiệp / censor / không liên
   thông, CI bootstrap, Cook's D và leave-one-out;
+- Kaplan–Meier / RMST: đường sống sót khi không censor, khi censor toàn bộ,
+  khi ties và censor trộn nhau, và RMST bằng trung bình cắt ngọn;
+- bootstrap phân tầng: khôi phục đúng đường thẳng khi dữ liệu tuyến tính chính
+  xác, CI hữu hạn và có thứ tự khi nhiễu, và yêu tối thiểu 3 cấu hình;
 - vòng đời job của web API (tạo, chạy, lấy kết quả, trả PNG);
 - validation đầu vào (N, bước, seed, họ đồ thị, tham số) và phục vụ UI tĩnh;
 - endpoint `/api/results`, `/api/law` và chặn tên tệp ngoài danh sách cho phép.
@@ -159,14 +172,14 @@ src/hive/          thư viện mô phỏng
   models.py        TRD, MRD, P-CL, P-MCL
   swarm.py         weighted voter well-mixed và trên đồ thị
   graphs.py        sinh đồ thị (kể cả hai buồng clique/thưa), tau, đường đi trung bình
-  metrics.py       t90, final mass, consensus, L2
+  metrics.py       t90, final mass, consensus, L2, Kaplan–Meier / RMST
   reproduce.py     thí nghiệm A (tái tạo)
   graph_sweep.py   thí nghiệm B (khảo sát đồ thị) + can thiệp hai buồng
-  analysis.py      chẩn đoán thống kê cho quy luật t90 ~ L
+  analysis.py      chẩn đoán thống kê cho quy luật t90 ~ L + bootstrap phân tầng
   bridge.py        nhân rộng gieo nguồn: t_first, độ dẫn của cầu, fit log-log
   hetero.py        buồng không đều: vị trí đầu cầu (hub/lá), Σ 1/bậc đầu cầu
   plots.py         hình cho báo cáo
-  config.py        cấu hình chung (RUN_ALL, HEAVY_TAIL, TWO_ROOM_SOURCE)
+  config.py        cấu hình chung (RUN_ALL, HEAVY_TAIL, TWO_ROOM_SOURCE, GRAPH_SEEDS)
   webapp.py        server cục bộ + job runner + API + biểu đồ cho UI
   ui/              index.html, styles.css, app.js (không CDN)
 scripts/           pipeline, kiểm tra đuôi nặng, hai buồng, chẩn đoán,
@@ -188,12 +201,21 @@ report/            report.md (nguồn) và report.pdf (tự động sinh)
 | Bảng 1c, Hình 5 (nhân rộng gieo nguồn) | `check_two_room_replicates.py` |
 | Bảng 1d–1e, Hình 6 (buồng thưa, `τ` vs `cầu/bậc`) | `check_two_room_sparse.py` |
 | Bảng 1f, Hình 7 (vị trí đầu cầu, hub/lá) | `check_two_room_hetero.py` |
+| Bảng 1b′ (RMST gieo nguồn) | `check_two_room.py` → `results/two_room_source_summary.csv` |
+| Hình 8, CI phân tầng nhiều graph seed | `check_graph_seeds.py` → `results/graph_seeds_law.json` |
 | CI / Cook's D / leave-one-out | `analyze_law.py` → `results/law_diagnostics.json` |
 
 ## Ghi chú
 
 - `t90` dùng trung bình trượt 5 bước với đệm biên bằng giá trị đầu/cuối,
   tránh việc các seed đạt ngưỡng sát cuối cửa sổ bị đánh dấu censored.
+- `rmst` (Kaplan–Meier) tính thời gian đạt ngưỡng trung bình có tính đến
+  censoring: seed không đạt ngưỡng đóng góp trọn thời gian quan sát, nên
+  so sánh được giữa các cấu hình có tỉ lệ đạt khác nhau. Bị chặn trên bởi
+  trần mô phỏng khi phần lớn seed không đạt ngưỡng.
+- `check_graph_seeds.py` dùng bootstrap phân tầng (resample graph trong cấu
+  hình, rồi seed trong graph) để CI của độ dốc phản ánh cả biến thiên giữa
+  các graph, không chỉ nhiễu seed trên một graph cố định như `analyze_law.py`.
 - `relaxation_time` dùng nhánh dense cho `n <= 512` và `eigsh(which="LA")`
   cho `n > 512`, nên trả về `λ₂` đại số (không phải `-1`) cả với đồ thị
   bipartite. `τ` là spectral gap (lazy walk trộn trong khoảng `2τ`), không

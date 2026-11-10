@@ -106,6 +106,90 @@ def bootstrap_law(
     }
 
 
+def _collapse_graphs(
+    graphs: list[tuple[float, np.ndarray]], rng: np.random.Generator | None = None
+) -> tuple[float, float]:
+    """One (L, t90) point from a config's graphs: mean L, mean of per-graph medians.
+
+    With ``rng`` the seeds inside each graph are resampled first, so the
+    statistic carries both graph-level and seed-level sampling noise.
+    """
+    ls: list[float] = []
+    ts: list[float] = []
+    for length, t90s in graphs:
+        if rng is not None:
+            t90s = t90s[rng.integers(0, t90s.size, t90s.size)]
+        ls.append(length)
+        ts.append(float(np.median(t90s)))
+    return float(np.mean(ls)), float(np.mean(ts))
+
+
+def hierarchical_bootstrap_law(
+    seeds: pd.DataFrame, n_boot: int = 500, seed: int = 0
+) -> dict[str, Any]:
+    """Cluster bootstrap for the ``t90 ~ L`` law over graphs then seeds.
+
+    ``seeds`` has one row per (config, graph, swarm seed) with columns
+    ``config``, ``graph_seed``, ``path_length`` and ``t90``. The point estimate
+    collapses each config to one (mean L, mean per-graph median t90) point and
+    fits OLS. Each bootstrap replicate resamples graphs with replacement within
+    every config and seeds with replacement within each drawn graph, then
+    refits, so the CI reflects both levels of variation instead of only the
+    swarm-seed noise of a single fixed graph.
+    """
+    groups: dict[str, list[tuple[float, np.ndarray]]] = {}
+    for config, cdf in seeds.groupby("config", sort=True):
+        graphs: list[tuple[float, np.ndarray]] = []
+        for _, gdf in cdf.groupby("graph_seed", sort=True):
+            graphs.append(
+                (float(gdf["path_length"].iloc[0]), _as_float(gdf["t90"]))
+            )
+        groups[str(config)] = graphs
+    configs = list(groups)
+    if len(configs) < 3:
+        return {"n_configs": len(configs), "error": "cần ít nhất 3 cấu hình"}
+
+    x = np.array([_collapse_graphs(groups[c])[0] for c in configs])
+    y = np.array([_collapse_graphs(groups[c])[1] for c in configs])
+    intercept, slope, r2 = _fit_line(x, y)
+
+    rng = np.random.default_rng(seed)
+    intercepts = np.empty(n_boot)
+    slopes = np.empty(n_boot)
+    r2s = np.empty(n_boot)
+    predictions = np.empty(n_boot)
+    for b in range(n_boot):
+        xb = np.empty(len(configs))
+        yb = np.empty(len(configs))
+        for j, c in enumerate(configs):
+            graphs = groups[c]
+            g = len(graphs)
+            drawn = [graphs[i] for i in rng.integers(0, g, g)]
+            xb[j], yb[j] = _collapse_graphs(drawn, rng)
+        i_b, s_b, r_b = _fit_line(xb, yb)
+        intercepts[b] = i_b
+        slopes[b] = s_b
+        r2s[b] = r_b
+        predictions[b] = i_b + s_b * L_REF
+
+    q = lambda draws: [float(np.percentile(draws, 2.5)), float(np.percentile(draws, 97.5))]
+    return {
+        "n_configs": len(configs),
+        "n_graphs": int(sum(len(g) for g in groups.values())),
+        "n_seeds": int(len(seeds)),
+        "intercept": float(intercept),
+        "slope": float(slope),
+        "r2": float(r2),
+        "prediction_at_L2": float(intercept + slope * L_REF),
+        "ci": {
+            "intercept": q(intercepts),
+            "slope": q(slopes),
+            "r2": q(r2s),
+            "prediction_at_L2": q(predictions),
+        },
+    }
+
+
 def _label(row: pd.Series) -> str:
     family = str(row.get("family", "?"))
     param = row.get("param", float("nan"))
