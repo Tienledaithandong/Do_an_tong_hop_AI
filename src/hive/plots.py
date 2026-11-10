@@ -249,6 +249,73 @@ def plot_graph_seeds(
     return _save(fig, out_dir, f"fig8_graph_seeds{suffix}")
 
 
+METHOD_STYLE = {
+    "symmetric": ("#1f77b4", "Đối xứng (headline)"),
+    "causal": ("#ff7f0e", "Nhân quả"),
+    "raw": ("#2ca02c", "Thô"),
+}
+
+
+def plot_threshold_sensitivity(
+    summaries: dict[str, pd.DataFrame],
+    fits: dict[str, dict],
+    two_room: pd.DataFrame,
+    out_dir: Path,
+    suffix: str = "",
+) -> list[Path]:
+    """How the t90 ~ L law and the bridge effect move with the crossing rule.
+
+    Left: the same trajectories measured three ways (centered, trailing, raw)
+    with one fitted line per definition. Right: the source-room RMST50 against
+    bridge width under each definition.
+    """
+    fig, (axl, axr) = plt.subplots(1, 2, figsize=(11.0, 4.4))
+
+    for method, summary in summaries.items():
+        color, label = METHOD_STYLE[method]
+        usable = summary[
+            (summary["family"] != "two_room")
+            & (summary["hit_rate"] >= 0.5)
+            & np.isfinite(pd.to_numeric(summary["t90"], errors="coerce"))
+        ]
+        axl.scatter(
+            usable["path_length"], usable["t90"],
+            s=28, color=color, alpha=0.45, edgecolors="none",
+        )
+        fit = fits.get(method, {})
+        if np.isfinite(fit.get("slope", float("nan"))):
+            xs = np.linspace(0.0, summary["path_length"].max() * 1.05, 50)
+            axl.plot(
+                xs, fit["intercept"] + fit["slope"] * xs,
+                color=color, linewidth=1.6,
+                label=f"{label}: slope {fit['slope']:.2f}, $R^2$ {fit['r2']:.2f}",
+            )
+    axl.set_ylim(0, None)
+    axl.set_xlabel(r"Đường đi trung bình  $L$")
+    axl.set_ylabel("Số bước đạt 90% (median mỗi cấu hình)")
+    axl.set_title("Quy luật L theo định nghĩa ngưỡng")
+    axl.legend(frameon=False, fontsize=8)
+    axl.grid(alpha=0.3)
+
+    for method in METHOD_STYLE:
+        sub = two_room[two_room["method"] == method].sort_values("bridge")
+        if sub.empty:
+            continue
+        color, label = METHOD_STYLE[method]
+        axr.plot(
+            sub["bridge"], sub["rmst50"], "-o",
+            color=color, ms=5, label=label,
+        )
+    axr.set_xlabel("Độ rộng cầu")
+    axr.set_ylabel(r"RMST$_{50}$ buồng đích (bước)")
+    axr.set_title("Hiệu ứng cầu theo định nghĩa ngưỡng")
+    axr.legend(frameon=False, fontsize=8)
+    axr.grid(alpha=0.3)
+
+    fig.tight_layout()
+    return _save(fig, out_dir, f"fig9_threshold_sensitivity{suffix}")
+
+
 def plot_trajectories(
     mean_curves: dict[str, np.ndarray], mrd: np.ndarray, out_dir: Path
 ) -> list[Path]:

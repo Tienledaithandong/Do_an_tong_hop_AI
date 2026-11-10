@@ -91,6 +91,16 @@ python scripts/check_two_room_hetero.py --quick  # vài giây
 python scripts/check_two_room_hetero.py --refit  # tính lại fit từ CSV đã lưu
 ```
 
+Độ nhạy của thời điểm đạt ngưỡng theo định nghĩa phép làm trơn (đối xứng /
+nhân quả / thô): chạy lại các cấu hình của quy luật `t90 ~ L` và thí nghiệm
+gieo nguồn, rồi đo lại ngưỡng trên *cùng* quỹ đạo theo ba định nghĩa để xem
+kết luận nào nhạy với cách đo:
+
+```bash
+python scripts/check_threshold_sensitivity.py          # ~2 phút; Hình 9
+python scripts/check_threshold_sensitivity.py --quick  # vài giây
+```
+
 `check_two_room.py` chỉ gieo type tốt nhất vào một buồng, rồi đo thời gian
 lan sang buồng còn lại theo độ rộng cầu. Đây là thiết kế can thiệp thay cho
 cấu hình hai buồng cũ (cả hai buồng đều đã có type tốt, nên cầu không mang
@@ -145,6 +155,9 @@ kiểm tra:
   thông, CI bootstrap, Cook's D và leave-one-out;
 - Kaplan–Meier / RMST: đường sống sót khi không censor, khi censor toàn bộ,
   khi ties và censor trộn nhau, và RMST bằng trung bình cắt ngọn;
+- định nghĩa thời điểm vượt ngưỡng: phép làm trơn đối xứng vượt trước tín hiệu
+  gốc, nhân quả/thô định vị đúng thời điểm xuất hiện, nhân quả không dùng dữ
+  liệu tương lai, và mọi định nghĩa đều trả censoring khi không đạt ngưỡng;
 - bootstrap phân tầng: khôi phục đúng đường thẳng khi dữ liệu tuyến tính chính
   xác, CI hữu hạn và có thứ tự khi nhiễu, và yêu tối thiểu 3 cấu hình;
 - vòng đời job của web API (tạo, chạy, lấy kết quả, trả PNG);
@@ -172,7 +185,7 @@ src/hive/          thư viện mô phỏng
   models.py        TRD, MRD, P-CL, P-MCL
   swarm.py         weighted voter well-mixed và trên đồ thị
   graphs.py        sinh đồ thị (kể cả hai buồng clique/thưa), tau, đường đi trung bình
-  metrics.py       t90, final mass, consensus, L2, Kaplan–Meier / RMST
+  metrics.py       t90 (đối xứng/nhân quả/thô), final mass, consensus, L2, Kaplan–Meier / RMST
   reproduce.py     thí nghiệm A (tái tạo)
   graph_sweep.py   thí nghiệm B (khảo sát đồ thị) + can thiệp hai buồng
   analysis.py      chẩn đoán thống kê cho quy luật t90 ~ L + bootstrap phân tầng
@@ -203,12 +216,18 @@ report/            report.md (nguồn) và report.pdf (tự động sinh)
 | Bảng 1f, Hình 7 (vị trí đầu cầu, hub/lá) | `check_two_room_hetero.py` |
 | Bảng 1b′ (RMST gieo nguồn) | `check_two_room.py` → `results/two_room_source_summary.csv` |
 | Hình 8, CI phân tầng nhiều graph seed | `check_graph_seeds.py` → `results/graph_seeds_law.json` |
+| Hình 9, độ nhạy định nghĩa ngưỡng | `check_threshold_sensitivity.py` → `results/threshold_sensitivity_fit.json` |
 | CI / Cook's D / leave-one-out | `analyze_law.py` → `results/law_diagnostics.json` |
 
 ## Ghi chú
 
-- `t90` dùng trung bình trượt 5 bước với đệm biên bằng giá trị đầu/cuối,
-  tránh việc các seed đạt ngưỡng sát cuối cửa sổ bị đánh dấu censored.
+- `t90` mặc định đọc lần vượt ngưỡng đầu tiên của **trung bình trượt đối xứng
+  5 bước** (đệm biên bằng giá trị đầu/cuối, tránh việc seed đạt ngưỡng sát cuối
+  cửa sổ bị đánh dấu censored). Vì cửa sổ đối xứng dùng cả dữ liệu tương lai,
+  thời điểm này có thể sớm hơn tín hiệu gốc; `threshold_time(..., method=...)`
+  hỗ trợ thêm `"causal"` (trung bình trượt đuôi, không nhìn trước) và `"raw"`
+  (không làm trơn). `check_threshold_sensitivity.py` đo lại ngưỡng trên cùng
+  quỹ đạo theo cả ba định nghĩa để kiểm tra độ nhạy của kết luận.
 - `rmst` (Kaplan–Meier) tính thời gian đạt ngưỡng trung bình có tính đến
   censoring: seed không đạt ngưỡng đóng góp trọn thời gian quan sát, nên
   so sánh được giữa các cấu hình có tỉ lệ đạt khác nhau. Bị chặn trên bởi

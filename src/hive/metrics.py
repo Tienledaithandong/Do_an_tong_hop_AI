@@ -24,10 +24,37 @@ def _smooth(curve: np.ndarray, window: int) -> np.ndarray:
     return np.convolve(padded, kernel, mode="valid")
 
 
+def _smooth_causal(curve: np.ndarray, window: int) -> np.ndarray:
+    """Trailing moving average: output ``i`` uses only ``curve[:i + 1]``.
+
+    Unlike the centered smoother this never looks ahead, so a crossing cannot
+    be reported before the signal that causes it has actually appeared.
+    """
+    curve = np.asarray(curve, dtype=float)
+    if window <= 1 or curve.size == 0:
+        return curve
+    kernel = np.ones(window) / window
+    padded = np.pad(curve, (window - 1, 0), mode="edge")
+    return np.convolve(padded, kernel, mode="valid")
+
+
+THRESHOLD_METHODS = ("symmetric", "causal", "raw")
+
+
 def threshold_time(
-    curve: np.ndarray, threshold: float = 0.9, window: int = 5
+    curve: np.ndarray,
+    threshold: float = 0.9,
+    window: int = 5,
+    method: str = "symmetric",
 ) -> tuple[float, bool]:
-    """First step where the smoothed curve reaches ``threshold``.
+    """First step where the curve reaches ``threshold``.
+
+    ``method`` selects how the curve is smoothed before the crossing is read:
+    ``"symmetric"`` (default) is the centered moving average used for the
+    headline numbers; ``"causal"`` is a trailing average that never uses future
+    data; ``"raw"`` reads the unsmoothed curve. The centered smoother can cross
+    *before* the raw signal appears, so it is a property of the smoothed curve,
+    not the physical first passage time — use ``"causal"``/``"raw"`` for that.
 
     Returns ``(step, hit)``. When the threshold is never reached the horizon is
     returned with ``hit=False``, so callers can report censoring instead of
@@ -36,7 +63,16 @@ def threshold_time(
     curve = np.asarray(curve, dtype=float)
     if curve.size == 0:
         return 0.0, False
-    smoothed = _smooth(curve, window)
+    if method == "symmetric":
+        smoothed = _smooth(curve, window)
+    elif method == "causal":
+        smoothed = _smooth_causal(curve, window)
+    elif method == "raw":
+        smoothed = curve
+    else:
+        raise ValueError(
+            f"method phải là một trong {', '.join(THRESHOLD_METHODS)}; nhận {method!r}"
+        )
     hits = np.flatnonzero(smoothed >= threshold)
     if hits.size == 0:
         return float(curve.size), False
@@ -44,10 +80,17 @@ def threshold_time(
 
 
 def t90(
-    curve: np.ndarray, threshold: float = 0.9, window: int = 5
+    curve: np.ndarray,
+    threshold: float = 0.9,
+    window: int = 5,
+    method: str = "symmetric",
 ) -> tuple[float, bool]:
-    """First step where the smoothed curve reaches 90% of the best option."""
-    return threshold_time(curve, threshold=threshold, window=window)
+    """First step where the curve reaches 90% of the best option.
+
+    ``method`` is forwarded to :func:`threshold_time`; the default keeps the
+    centered-smoother definition used throughout the report.
+    """
+    return threshold_time(curve, threshold=threshold, window=window, method=method)
 
 
 def kaplan_meier(

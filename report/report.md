@@ -119,7 +119,7 @@ Mỗi cấu hình dùng **một đồ thị cố định** (seed 0) và 100 seed
 
 ### 3.3. Đo lường
 
-- `t₉₀`: bước đầu tiên mà trung bình trượt 5 bước của tỉ lệ cá thể chọn phương án tốt nhất đạt 0,9. Trung bình trượt dùng đệm biên bằng giá trị đầu/cuối, để các seed đạt ngưỡng sát cuối cửa sổ không bị tính nhầm là censored. Nếu không đạt trong `T` bước, giá trị được đánh dấu *censored* và báo cáo riêng thay vì gán bằng `T`.
+- `t₉₀`: bước đầu tiên mà **trung bình trượt đối xứng 5 bước** (centered moving average) của tỉ lệ cá thể chọn phương án tốt nhất đạt 0,9. Trung bình trượt dùng đệm biên bằng giá trị đầu/cuối, để các seed đạt ngưỡng sát cuối cửa sổ không bị tính nhầm là censored. Nếu không đạt trong `T` bước, giá trị được đánh dấu *censored* và báo cáo riêng thay vì gán bằng `T`. Cần nhấn mạnh: vì cửa sổ đối xứng dùng cả dữ liệu tương lai, `t₉₀` là thời điểm vượt ngưỡng của *đường đã làm trơn*, không phải thời điểm vật lý đầu tiên tín hiệu xuất hiện — nó có thể sớm hơn vài bước. `threshold_time`/`t90` nhận thêm `method="causal"` (trung bình trượt đuôi, chỉ dùng quá khứ + hiện tại) và `method="raw"` (không làm trơn); §5.8 so sánh ba định nghĩa trên cùng quỹ đạo để kiểm tra kết luận nào nhạy với cách đo. Mặc định toàn báo cáo giữ `"symmetric"` để nhất quán với các con số headline.
 - `final_best_mass`: trung bình tỉ lệ chọn phương án tốt nhất trong 10% bước cuối.
 - `consensus`: khối lượng của phương án phổ biến nhất ở bước cuối.
 - `l2_mrd`: khoảng cách RMS giữa đường học thực nghiệm và đường MRD.
@@ -379,6 +379,26 @@ Bốn kết quả:
 
 Giới hạn: chỉ một `N = 400`, chỉ BA với `m = 3`, cầu ≤ 8, 5 đồ thị mỗi ô, và `Σ 1/bậc(đầu cầu đích)` có chứa chính số cạnh cầu nên một phần `R²` 0,97 là do độ rộng cầu (phân tích *trong* từng độ rộng cầu ở trên xử lý điều này). Số mũ −0,69 thay vì −1 lại giống §5.5–5.6, nên quy luật `1/bậc` chưa đầy đủ. CI hẹp chỉ phản ánh biến thiên giữa 5 đồ thị.
 
+### 5.8. Độ nhạy theo định nghĩa thời điểm đạt ngưỡng
+
+`t₉₀` mặc định đọc lần vượt ngưỡng của trung bình trượt *đối xứng*, vốn dùng cả dữ liệu tương lai nên có thể báo sớm hơn thời điểm tín hiệu thực xuất hiện: với `[0,0,0,1,1,1]`, ngưỡng 0,1, cửa sổ 5, phép đối xứng trả bước 1 dù giá trị khác 0 đầu tiên chỉ ở bước 3. Để định lượng mức nhạy, `scripts/check_threshold_sensitivity.py` chạy lại 16 cấu hình của quy luật `L` (`N = 500`, 400 bước, 100 seed) và thí nghiệm gieo nguồn (`N = 300`, 600 bước, 30 seed), rồi đo lại ngưỡng trên **cùng** quỹ đạo theo ba định nghĩa: đối xứng (headline), nhân quả (trung bình trượt đuôi, không nhìn trước) và thô (không làm trơn). Kết quả ở Hình 9 và `results/threshold_sensitivity_*`.
+
+**Quy luật `L`.** Cả ba định nghĩa cho cùng một kết luận định tính (Bảng 1g). Phép nhân quả chỉ tịnh tiến tung độ gốc **+2,0 bước** — độ trễ hằng số bằng nửa cửa sổ — và giữ nguyên độ dốc lẫn `R²`; phép thô hạ độ dốc còn 3,27 với `R²` gần như không đổi. Vậy phát biểu "`t₉₀` tăng xấp xỉ tuyến tính theo `L`, độ dốc cỡ 3,3–3,5" không phụ thuộc định nghĩa ngưỡng.
+
+Bảng 1g. Quy luật `t₉₀ ~ L` khớp lại trên cùng quỹ đạo theo ba định nghĩa vượt ngưỡng (16 cấu hình, `N = 500`, 100 seed).
+
+| Định nghĩa | Tung độ gốc | Độ dốc | R² |
+|---|---|---|---|
+| Đối xứng (headline) | 44,85 | 3,46 | 0,910 |
+| Nhân quả | 46,85 | 3,46 | 0,910 |
+| Thô | 43,86 | 3,27 | 0,909 |
+
+**Hiệu ứng cầu.** RMST₅₀ buồng đích giảm đơn điệu theo độ rộng cầu dưới cả ba định nghĩa: cầu 1 → 12 cho **550,6 → 185,8** (đối xứng), **551,1 → 187,6** (nhân quả), **550,5 → 184,3** (thô). Tỉ lệ seed đạt ngưỡng giống hệt nhau giữa ba định nghĩa (0,27 / 0,63 / 0,93 / 0,93 cho cầu 1 / 3 / 6 / 12), nên phân loại censoring không nhạy với cách đo; chỉ bước vượt ngưỡng dịch chừng ±2. Trung vị có điều kiện `t₅₀` cầu 1 → 12 là 425,5 → 132,5 (đối xứng), 427,5 → 134,5 (nhân quả), 424,0 → 131,5 (thô) — cùng một câu chuyện giảm hơn ba lần.
+
+![Hình 9. Độ nhạy theo định nghĩa ngưỡng. Trái: quy luật L khớp theo ba định nghĩa trên cùng quỹ đạo. Phải: RMST₅₀ buồng đích theo độ rộng cầu; ba đường gần trùng nhau.](figures/fig9_threshold_sensitivity.png)
+
+**Kết luận.** Độ lệch giữa các định nghĩa chỉ cỡ ±2 bước, nhỏ hơn nhiều thang thời gian 100–550 bước của thí nghiệm. Hiện tượng "vượt trước tín hiệu" của cửa sổ đối xứng là thật về nguyên tắc nhưng không đổi kết luận nào ở đây: cả quy luật `L` lẫn hiệu ứng nút cổ chai đều bền với cách đo. Dù vậy `t₉₀` nên được đọc đúng là thời điểm của *đường làm trơn đối xứng*; khi cần thời điểm vật lý đầu tiên, dùng `method="causal"` hoặc `"raw"`.
+
 ## 6. Thảo luận
 
 Vì sao đường đi trung bình lại dự báo tốt hơn thời gian relaxation?
@@ -397,7 +417,7 @@ Ba thí nghiệm khớp với bức tranh hai kênh. Đồ thị đầy đủ v�
 2. **Cùng một kịch bản chất lượng.** Thí nghiệm đồ thị chỉ dùng `q ∈ [0,4; 0,7]`. Với dải chất lượng thấp hơn, nhiễu tương đối lớn hơn và đàn dễ kẹt ở phương án tầm trung.
 3. **Mạng bậc nặng đuôi mới chỉ khảo sát sơ bộ.** Mục 5.4 kiểm tra thêm ba mạng ngoài phạm vi quét chính (BA `m = 2`, BA `m = 5`, ER bậc 6) với 100 seed: quy luật `L` vẫn giữ, nhưng sai lệch so với đường hiệu chuẩn là −3,4…+1,0 bước và BA `m = 2` lệch **dương**, tức ba điểm chưa đủ để khẳng định quy luật phổ quát cho mọi mạng đuôi nặng. Cần quét có hệ thống theo hệ số biến thiên bậc để kết luận.
 4. **Không có cơ chế khám phá.** Như bài báo gốc, khi một phương án biến mất khỏi quần thể thì nó không thể quay lại. Trong môi trường thay đổi theo thời gian, đàn sẽ không thích nghi được.
-5. **`t₉₀` phụ thuộc ngưỡng và cửa sổ làm trơn.** Đã cố định 0,9 và 5 bước cho mọi cấu hình, nhưng các ngưỡng khác có thể cho hệ số hồi quy khác.
+5. **`t₉₀` phụ thuộc ngưỡng và cửa sổ làm trơn.** Đã cố định 0,9 và 5 bước cho mọi cấu hình, nhưng các ngưỡng khác có thể cho hệ số hồi quy khác. Thêm nữa, trung bình trượt *đối xứng* dùng dữ liệu tương lai nên `t₉₀` là thời điểm vượt ngưỡng của đường đã làm trơn, có thể sớm hơn thời điểm vật lý đầu tiên; §5.8 đo lại ngưỡng trên cùng quỹ đạo theo phép làm trơn nhân quả và dữ liệu thô để định lượng mức nhạy này.
 6. **Quy luật `L` là xấp xỉ mô tả, không phải định luật.** CI 95% của độ dốc là 3,04–6,67 khi hiệu chuẩn trên một graph mỗi cấu hình, và siết lại còn 3,40–4,33 khi trung bình 10 graph với bootstrap phân tầng (§5.3); một điểm (`WS p = 0`) có Cook's D = 10 và leverage 0,73; có hiệu ứng họ +13,4 bước (`p = 0,039`); thêm bậc và degree CV giải thích thêm 5,1% phương sai. Nên đọc quy luật trong phạm vi WS/RGG đã khảo sát, không ngoại suy cho mọi đồ thị.
 7. **Thí nghiệm gieo nguồn.** Bản đầu (§5.2) là pilot: một đồ thị cho mỗi độ rộng cầu, `N = 300`, 30 seed. Bản nhân rộng (§5.5) dùng 4 đồ thị, `N ∈ {200, 400, 600}` và cầu 1–16, nên CI phản ánh biến thiên giữa đồ thị, nhưng chỉ 4 đồ thị mỗi ô và 15 trung vị cho mỗi phép khớp; ở cầu 1 khoảng 40% lần chạy bị censor nên trung vị `t₅₀` không đáng tin bằng các ô khác. Vẫn chưa đo trực tiếp thông lượng qua cầu hay vận tốc mặt trận. Với clique `τ` và độ dẫn cầu biến thiên cùng nhau (cả hai do độ rộng cầu quyết định), nên §5.5 chỉ chứng minh `L` không đủ; §5.6 tách được `τ` khỏi `φ` bằng buồng thưa, nhưng chỉ với hai bậc `d`, buồng đều ngẫu nhiên và 4 đồ thị mỗi ô, và `τ` tương quan mạnh với `cầu/bậc` (−0,96). Với `t₅₀` (không chỉ lần tới đầu tiên), không đại lượng nào tách ra được. §5.7 thêm buồng Barabási–Albert: lần tới đầu tiên phụ thuộc bậc của đầu cầu phía đích, nhưng chỉ với một `N = 400`, một giá trị `m = 3`, cầu ≤ 8 và 5 đồ thị mỗi ô; với `t₅₀` thì hiệu ứng của hub bị triệt tiêu (hub khó bị xâm nhập nhưng cũng khó bị chỉnh lại) và `τ` thắng. Cơ chế này mới được đo bằng số lần tới/mất, chưa đo xác suất trụ của từng lần.
 
