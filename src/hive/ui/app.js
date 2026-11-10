@@ -381,8 +381,9 @@ function renderGraph(result, jobId, ui) {
   ui.metrics.innerHTML = [
     metric('τ (relaxation)', fmtTau(metrics.tau), connected ? 'thời gian trộn' : 'không liên thông', connected ? '' : 'warn'),
     metric('L (đường đi)', fmt(metrics.path_length, 2), 'khoảng cách trung bình'),
-    metric('t₉₀ trung vị', fmt(summary.t90_median, 1), 'bước', hitTone),
+    metric('t₉₀ trung vị (nhóm đạt)', summary.t90_median == null ? 'không xác định' : fmt(summary.t90_median, 1), summary.t90_median == null ? `không seed nào đạt trong ${params.steps} bước` : 'bước · có điều kiện', hitTone),
     metric('Seed đạt t₉₀', pct(summary.hit_rate), `${params.seeds} seed`, hitTone),
+    metric('RMST₉₀', fmt(summary.t90_rmst, 1), `cửa sổ ${params.steps} bước`, hitTone),
     metric('Final (trung vị)', fmt(summary.final_median, 3), 'best mass'),
     metric('Final ≥ 0,95', pct(summary.final95), 'tỉ lệ seed', finalTone),
     metric('Consensus', fmt(summary.consensus_median, 3), 'khối lượng lớn nhất'),
@@ -480,6 +481,7 @@ function renderCompare(result, jobId, ui) {
       <td class="num">${fmtTau(row.tau)}</td>
       <td class="num">${fmt(row.path_length, 2)}</td>
       <td class="num">${fmt(row.t90_median, 1)}</td>
+      <td class="num">${fmt(row.t90_rmst, 1)}</td>
       <td class="num">${pct(row.hit_rate)}</td>
       <td class="num">${pct(row.final95)}</td>
       <td>${row.connected ? 'có' : 'không'}</td>
@@ -501,7 +503,7 @@ function renderCompare(result, jobId, ui) {
     notes.push(`Hai buồng: τ trải ${spread} nhưng t₉₀ gần như đứng yên — kiểm định tách τ khỏi L.`);
   }
   if (censored.length) {
-    notes.push(`${censored.length} cấu hình có seed bị censor ở ngưỡng 0,9; t₉₀ trung vị là cận dưới.`);
+    notes.push(`${censored.length} cấu hình có seed bị censor ở ngưỡng 0,9; t₉₀ trung vị là có điều kiện trên nhóm đạt, còn RMST₉₀ so sánh được giữa các cấu hình không lệch bởi censoring.`);
   }
   if (result.params.N < 200) {
     notes.push('N nhỏ: τ và L khác bảng trong báo cáo (N=500).');

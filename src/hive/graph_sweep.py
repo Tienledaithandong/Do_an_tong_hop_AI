@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 from scipy import sparse
 
-from .bandit import Bandit, make_q
+from .bandit import Bandit, expected_rewards, make_q
 from .graphs import (
     average_path_length,
     degree_stats,
@@ -78,14 +78,17 @@ def initial_types_source_room(
 
 
 def reference_mrd(
-    q: np.ndarray, steps: int, pi0: np.ndarray | None = None
+    q: np.ndarray, steps: int, pi0: np.ndarray | None = None, delta: float = 0.0
 ) -> np.ndarray:
     """Deterministic MRD curve, the well-mixed benchmark.
 
     ``pi0`` defaults to the uniform policy; pass the empirical initial type
     distribution when the simulated population does not start uniform, so
-    the comparison shares its initial condition.
+    the comparison shares its initial condition. ``delta`` applies the reward
+    clipping to the fitness means so the reference faces the same environment
+    as the learners when ``q +/- delta`` leaves the unit interval.
     """
+    q = expected_rewards(q, delta)
     pi = np.full(q.size, 1.0 / q.size) if pi0 is None else np.asarray(pi0, dtype=float)
     best = int(np.argmax(q))
     curve = np.empty(steps + 1)
@@ -118,9 +121,9 @@ def simulate_on_graph(
     n = int(q.size) if n_types is None else n_types
     best = int(np.argmax(q))
     N = adj.shape[0]
-    mrd_curve = reference_mrd(q, steps)
 
     curves = np.zeros((seeds, steps + 1))
+    mrd_curves = np.zeros((seeds, steps + 1))
     t90s = np.zeros(seeds)
     hits = np.zeros(seeds, dtype=bool)
     finals = np.zeros(seeds)
@@ -132,6 +135,9 @@ def simulate_on_graph(
         rng = np.random.default_rng(seed)
         bandit = Bandit(q, delta=delta, rng=rng)
         types = _initial_types(rng, n, N)
+        mrd_curves[seed] = reference_mrd(
+            q, steps, pi0=np.bincount(types, minlength=n) / N, delta=delta
+        )
         curve = curves[seed]
         curve[0] = best_mass(types, best)
 
@@ -147,7 +153,7 @@ def simulate_on_graph(
         finals[seed] = float(curve[-tail:].mean())
         counts = np.bincount(types, minlength=n) / N
         consensuses[seed] = consensus(counts)
-        l2s[seed] = l2_to_reference(curve, mrd_curve)
+        l2s[seed] = l2_to_reference(curve, mrd_curves[seed])
         if progress is not None:
             progress(seed + 1, seeds)
 
@@ -158,7 +164,7 @@ def simulate_on_graph(
         "final": finals,
         "consensus": consensuses,
         "l2_mrd": l2s,
-        "mrd": mrd_curve,
+        "mrd": mrd_curves.mean(axis=0),
     }
     if return_state and seeds > 0:
         result["final_types"] = types.copy()
@@ -216,7 +222,9 @@ def simulate_two_room_source(
         rng = np.random.default_rng(seed)
         bandit = Bandit(q, delta=delta, rng=rng)
         types = initial_types_source_room(rng, n, N, best, source_mask)
-        mrd_curve = reference_mrd(q, steps, pi0=np.bincount(types, minlength=n) / N)
+        mrd_curve = reference_mrd(
+            q, steps, pi0=np.bincount(types, minlength=n) / N, delta=delta
+        )
         overall = curves["curves"][seed]
         source_curve = curves["source_curves"][seed]
         target_curve = curves["target_curves"][seed]

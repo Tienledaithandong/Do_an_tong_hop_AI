@@ -22,6 +22,27 @@ def make_q(scenario: str = "middle", n: int = 10) -> np.ndarray:
     return np.linspace(lo, hi, n)
 
 
+def expected_rewards(q: np.ndarray, delta: float) -> np.ndarray:
+    """Mean of the *clipped* reward ``E[clip(U(q-delta, q+delta), 0, 1)]``.
+
+    When ``q +/- delta`` leaves the unit interval the clipping biases the mean
+    away from ``q``, so a replicator reference driven by raw ``q`` would compare
+    against a different environment than the one the learners actually face.
+    """
+    q = np.asarray(q, dtype=float)
+    if delta <= 0:
+        return np.clip(q, 0.0, 1.0)
+    lo = q - delta
+    hi = q + delta
+    width = hi - lo
+    a = np.maximum(lo, 0.0)
+    b = np.minimum(hi, 1.0)
+    mid_mass = np.clip(b - a, 0.0, None) / width
+    mid_mean = np.where(b > a, (a + b) / 2.0, 0.0)
+    p_above = np.clip(hi - 1.0, 0.0, None) / width
+    return mid_mass * mid_mean + p_above
+
+
 def sample_rewards(
     q: np.ndarray, actions: np.ndarray, delta: float, rng: np.random.Generator
 ) -> np.ndarray:

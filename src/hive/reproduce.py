@@ -11,7 +11,7 @@ from collections.abc import Callable
 
 import numpy as np
 
-from .bandit import Bandit, make_q
+from .bandit import Bandit, expected_rewards, make_q
 from .metrics import best_mass
 from .models import mrd_step, p_mcl_step
 from .swarm import well_mixed_voter
@@ -33,6 +33,7 @@ def run_reproduction(
     each seed so a UI can show a progress bar.
     """
     q = make_q(scenario, n)
+    q_eff = expected_rewards(q, delta)
     best = int(np.argmax(q))
     batch = N if B is None else B
 
@@ -52,7 +53,7 @@ def run_reproduction(
         rng.shuffle(types)
 
         pi_pmcl = np.full(n, 1.0 / n)
-        pi_mrd = np.full(n, 1.0 / n)
+        pi_mrd = np.bincount(types, minlength=n) / N
         curves["well_mixed"][seed, 0] = best_mass(types, best)
         curves["pmcl"][seed, 0] = pi_pmcl[best]
         curves["mrd"][seed, 0] = pi_mrd[best]
@@ -65,7 +66,7 @@ def run_reproduction(
             pi_pmcl = p_mcl_step(pi_pmcl, q, rng, B=batch, delta=delta)
             curves["pmcl"][seed, step + 1] = pi_pmcl[best]
 
-            pi_mrd = mrd_step(pi_mrd, q)
+            pi_mrd = mrd_step(pi_mrd, q_eff)
             curves["mrd"][seed, step + 1] = pi_mrd[best]
 
         if progress is not None:

@@ -28,9 +28,9 @@ def test_source_room_mrd_baseline_shares_the_initial_condition(monkeypatch):
     seen = []
     real = gs.reference_mrd
 
-    def spy(q, steps, pi0=None):
+    def spy(q, steps, pi0=None, delta=0.0):
         seen.append(pi0)
-        return real(q, steps, pi0=pi0)
+        return real(q, steps, pi0=pi0, delta=delta)
 
     monkeypatch.setattr(gs, "reference_mrd", spy)
     N, n = 40, 5

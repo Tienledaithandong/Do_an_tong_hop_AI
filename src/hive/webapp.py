@@ -53,7 +53,7 @@ from .graphs import (
     relaxation_time,
     two_room_graph,
 )
-from .metrics import t90
+from .metrics import rmst, t90
 from .plots import COLORS, config_summary, fit_law
 from .reproduce import run_reproduction
 
@@ -233,13 +233,37 @@ def _common(payload: dict) -> dict[str, Any]:
         raise ValidationError(
             "scenario phải là một trong " + ", ".join(sorted(SCENARIOS))
         )
+    N = _integer(payload, "N", 150, 20, 800)
+    n = _integer(payload, "n", 10, 2, 30)
+    if N < n:
+        raise ValidationError(
+            "N phải >= n: quần thể cần ít nhất một cá thể cho mỗi phương án, "
+            "nếu không phương án vắng mặt không thể tự xuất hiện lại"
+        )
     return {
-        "N": _integer(payload, "N", 150, 20, 800),
+        "N": N,
         "steps": _integer(payload, "steps", 120, 10, 1000),
         "seeds": _integer(payload, "seeds", 8, 1, 200),
-        "n": _integer(payload, "n", 10, 2, 30),
+        "n": n,
         "scenario": scenario,
         "delta": _number(payload, "delta", 0.1, 0.0, 0.5),
+    }
+
+
+def _t90_summary(t90: np.ndarray, hit: np.ndarray, steps: int) -> dict[str, Any]:
+    """Censoring-aware threshold-time summary.
+
+    The median is conditional on the seeds that actually reached the threshold
+    (``None`` when none did); the censoring sentinel is never averaged in as if
+    it were an observed time. RMST and the hit rate carry the censoring info.
+    """
+    t90 = np.asarray(t90, dtype=float)
+    hit = np.asarray(hit, dtype=bool)
+    reached = t90[hit]
+    return {
+        "t90_median": float(np.median(reached)) if reached.size else None,
+        "t90_rmst": rmst(t90, hit, steps),
+        "hit_rate": float(hit.mean()),
     }
 
 
@@ -512,7 +536,7 @@ def _plot_compare(rows: list[dict[str, Any]], fit: dict[str, Any]) -> bytes:
 
     def scatter(ax: plt.Axes, x_key: str, logx: bool) -> None:
         for row in rows:
-            if row[x_key] is None:
+            if row[x_key] is None or row["t90_median"] is None:
                 continue
             color = FAMILY_COLORS.get(row["family"], "#555555")
             censored = row["hit_rate"] < 0.5
@@ -738,9 +762,7 @@ def _run_graph(job: Job) -> tuple[dict[str, Any], dict[str, bytes]]:
     std_curve = res["curves"].std(axis=0)
     finals = res["final"]
     summary = {
-        "t90_median": float(np.median(res["t90"])),
-        "t90_mean": float(np.mean(res["t90"])),
-        "hit_rate": float(np.mean(res["hit"])),
+        **_t90_summary(res["t90"], res["hit"], common["steps"]),
         "final_median": float(np.median(finals)),
         "final95": float(np.mean(finals >= 0.95)),
         "consensus_median": float(np.median(res["consensus"])),
@@ -835,9 +857,7 @@ def _run_compare(job: Job) -> tuple[dict[str, Any], dict[str, bytes]]:
                 "degree_cv": metrics["degree_cv"],
                 "connected": metrics["connected"],
                 "edges": metrics["edges"],
-                "t90_median": float(np.median(res["t90"])),
-                "t90_mean": float(np.mean(res["t90"])),
-                "hit_rate": float(np.mean(res["hit"])),
+                **_t90_summary(res["t90"], res["hit"], common["steps"]),
                 "final_median": float(np.median(res["final"])),
                 "final95": float(np.mean(res["final"] >= 0.95)),
                 "consensus_median": float(np.median(res["consensus"])),

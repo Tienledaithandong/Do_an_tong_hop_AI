@@ -311,6 +311,25 @@ def test_common_validation_rejects_out_of_range_values():
         webapp._common({"delta": 0.9})
 
 
+def test_common_validation_requires_population_at_least_number_of_options():
+    with pytest.raises(webapp.ValidationError):
+        webapp._common({"N": 20, "n": 30})
+    assert webapp._common({"N": 30, "n": 30})["N"] == 30
+
+
+def test_t90_summary_is_conditional_and_censoring_aware():
+    # Two of three runs censor at the horizon; the sentinel must not enter the
+    # median, and with no hits the median is undefined rather than the horizon.
+    summary = webapp._t90_summary(np.array([5.0, 11.0, 11.0]), np.array([True, False, False]), 10)
+    assert summary["t90_median"] == pytest.approx(5.0)
+    assert summary["hit_rate"] == pytest.approx(1 / 3)
+    assert summary["t90_rmst"] == pytest.approx(5 + 5 * 2 / 3)
+    none_hit = webapp._t90_summary(np.array([11.0, 11.0]), np.zeros(2, dtype=bool), 10)
+    assert none_hit["t90_median"] is None
+    assert none_hit["hit_rate"] == 0.0
+    assert none_hit["t90_rmst"] == pytest.approx(10.0)
+
+
 def test_family_parameters_are_clamped_to_the_graph_size():
     assert webapp._family_param("complete", 99, 50) == ("complete", 1.0)
     with pytest.raises(webapp.ValidationError):

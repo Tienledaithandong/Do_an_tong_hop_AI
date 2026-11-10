@@ -3,7 +3,7 @@ import pytest
 from scipy import sparse
 
 from hive.bandit import make_q
-from hive.graph_sweep import simulate_on_graph
+from hive.graph_sweep import reference_mrd, simulate_on_graph
 from hive.graphs import average_path_length, relaxation_time, two_room_graph
 
 
@@ -38,3 +38,26 @@ def test_two_room_bottleneck_does_not_slow_learning():
     res = simulate_on_graph(adj, make_q("middle"), steps=120, seeds=4, n_types=10)
     assert np.isfinite(res["curves"]).all()
     assert res["t90"].mean() < 90.0
+
+
+def test_mrd_reference_shares_each_seeds_initial_distribution():
+    # N not divisible by n: the empirical start is not uniform and differs
+    # per seed, so the averaged MRD must start at the averaged empirical mass,
+    # not at 1/n.
+    adj = complete_graph_adj(25)
+    res = simulate_on_graph(adj, make_q("middle"), steps=20, seeds=5, n_types=10)
+    assert res["mrd"][0] == pytest.approx(res["curves"][:, 0].mean(), abs=1e-12)
+    assert res["mrd"][0] != pytest.approx(0.1, abs=1e-9)
+
+
+def test_mrd_reference_uses_the_clipped_reward_expectation():
+    # high scenario with delta=0.5 pushes q+delta past 1, so the reference must
+    # use E[clip(...)] rather than raw q. With N divisible by n every seed starts
+    # uniform, so the averaged MRD equals the uniform-init clipped reference.
+    q = make_q("high")
+    adj = complete_graph_adj(30)
+    res = simulate_on_graph(adj, q, steps=40, seeds=3, delta=0.5, n_types=10)
+    clipped = reference_mrd(q, 40, delta=0.5)
+    raw = reference_mrd(q, 40, delta=0.0)
+    assert np.allclose(res["mrd"], clipped, atol=1e-12)
+    assert not np.allclose(clipped, raw, atol=1e-3)
