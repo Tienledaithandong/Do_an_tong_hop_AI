@@ -85,6 +85,8 @@ Trong mô hình well-mixed, `N(i)` là toàn bộ quần thể trừ chính `i`.
 
 là thang thời gian của quá trình khuếch tán trên đồ thị. `τ ≈ 1` tương ứng quần thể trộn đều; `τ` lớn tương ứng thông tin lan chậm. Lưu ý `λ₂` một mình không đủ: với vòng lattice 500 đỉnh bậc 6 (WS `p = 0`), `λ₂ ≈ 0,9996` trông gần hoàn hảo nhưng `τ ≈ 2.714` bước.
 
+`λ₂` ở đây là eigenvalue lớn thứ hai **theo giá trị đại số**, nên `τ` là một đại lượng spectral gap: bước đi ngẫu nhiên *lazy* trộn trong khoảng `2τ` bước. Nó không bảo đảm trộn cho bước đi không lazy trên đồ thị tuần hoàn (hai phía): đồ thị hai nút có `τ = 0,5` nhưng sao chép đồng bộ chỉ đổi chỗ type mãi mãi. Mọi topology khảo sát trong đồ án đều không hai phía, nên lưu ý này không thay đổi số liệu nào.
+
 **Đường đi trung bình.** `L` là khoảng cách ngắn nhất trung bình trên mọi cặp đỉnh liên thông. Đây là thang *khoảng cách* của đồ thị, không phải thang *thời gian trộn*.
 
 ## 3. Phương pháp
@@ -239,9 +241,9 @@ Ba mạng ngoài phạm vi quét chính được chạy với cùng `N = 500`, 4
 |---|---|---|---|---|---|
 | BA m = 2 | 5,66 | 3,79 | 59,0 | 58,0 | +1,0 |
 | BA m = 5 | 2,32 | 2,77 | 51,0 | 54,4 | −3,4 |
-| ER bậc 6 | ∞ | 3,65 | 58,0 | 57,5 | +0,5 |
+| ER bậc 6 | 3,70 | 3,65 | 56,5 | 57,5 | −1,0 |
 
-Quy luật `L` vẫn giữ trong sai số ±3,4 bước. BA `m = 2` lệch dương, tức mạng đuôi nặng có xu hướng chậm hơn dự đoán; ba điểm chưa đủ để khẳng định quy luật phổ quát cho mọi mạng đuôi nặng. Cần quét có hệ thống theo hệ số biến thiên bậc (degree CV) để kết luận. ER bậc 6 có `τ = ∞` vì đồ thị sinh ra bị phân mảnh, nhưng `L` vẫn hữu hạn trên các cặp đến được.
+Quy luật `L` vẫn giữ trong sai số ±3,4 bước. BA `m = 2` lệch dương, tức mạng đuôi nặng có xu hướng chậm hơn dự đoán; ba điểm chưa đủ để khẳng định quy luật phổ quát cho mọi mạng đuôi nặng. Cần quét có hệ thống theo hệ số biến thiên bậc (degree CV) để kết luận. ER bậc 6 được lấy mẫu **có điều kiện liên thông** (thử lại tới khi đồ thị liên thông) để `τ` và `L` cùng nghĩa với tập hiệu chuẩn; bản ER không điều kiện trước đó bị phân mảnh (`τ = ∞`, `L` chỉ đo trên các cặp đến được) nên không phải một điểm kiểm định sạch.
 
 ### 5.5. Nhân rộng thí nghiệm gieo nguồn: độ dẫn của cầu
 

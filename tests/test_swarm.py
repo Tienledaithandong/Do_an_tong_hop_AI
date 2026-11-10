@@ -2,7 +2,33 @@ import numpy as np
 import pytest
 from scipy import sparse
 
-from hive.swarm import graph_voter, well_mixed_voter
+from hive.swarm import _sample_neighbours, graph_voter, well_mixed_voter
+
+
+def test_finite_neighbourhood_excludes_self_and_duplicates():
+    idx = _sample_neighbours(12, 4, np.random.default_rng(0))
+    assert idx.shape == (12, 4)
+    assert not (idx == np.arange(12)[:, None]).any()
+    assert all(len(set(row)) == 4 for row in idx.tolist())
+
+
+def test_finite_neighbourhood_is_uniform_over_the_other_individuals():
+    n, m, draws = 6, 2, 6000
+    rng = np.random.default_rng(1)
+    counts = np.zeros((n, n))
+    for _ in range(draws):
+        idx = _sample_neighbours(n, m, rng)
+        np.add.at(counts, (np.repeat(np.arange(n), m), idx.ravel()), 1)
+    assert counts[np.eye(n, dtype=bool)].sum() == 0
+    expected = draws * m / (n - 1)
+    assert np.allclose(counts[~np.eye(n, dtype=bool)], expected, rtol=0.08)
+
+
+def test_finite_neighbourhood_rejects_non_positive_size():
+    with pytest.raises(ValueError):
+        well_mixed_voter(
+            np.zeros(5, dtype=int), np.ones(5), np.random.default_rng(0), M=0
+        )
 
 
 def test_equal_rewards_give_frequency_proportional_votes():

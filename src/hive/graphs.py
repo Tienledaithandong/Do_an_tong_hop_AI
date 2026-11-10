@@ -5,6 +5,13 @@ graph, where ``lambda2`` is the second largest eigenvalue of the symmetric
 normalised adjacency ``S = D^-1/2 A D^-1/2``. ``tau`` is the natural clock of
 consensus-like dynamics: ``tau ~ 1`` means a well-mixed population, large
 ``tau`` means information crawls.
+
+``lambda2`` is the second largest *algebraic* eigenvalue, so ``tau`` is a
+spectral-gap quantity: the lazy random walk mixes in about ``2 * tau`` steps.
+It is not a mixing guarantee for the non-lazy walk on periodic (bipartite)
+graphs — a two-node graph has ``tau = 0.5`` yet synchronous copying oscillates
+forever. Every topology surveyed in this project is non-bipartite, so the
+caveat does not touch the reported numbers.
 """
 
 from __future__ import annotations
@@ -227,7 +234,11 @@ def two_room_hetero(
 
 
 def relaxation_time(adj: sparse.spmatrix) -> tuple[float, float]:
-    """Return ``(lambda2, tau)``; disconnected graphs give ``tau = inf``."""
+    """Return ``(lambda2, tau)``; disconnected graphs give ``tau = inf``.
+
+    Bipartite graphs keep a finite tau because lambda2 is algebraic; see the
+    module docstring for why that is a spectral gap, not a mixing guarantee.
+    """
     adj = sparse.csr_matrix(adj, dtype=float)
     n = adj.shape[0]
     if n < 2 or not is_connected(adj):

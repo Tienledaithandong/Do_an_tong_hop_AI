@@ -37,6 +37,21 @@ def test_two_node_graph_has_a_finite_relaxation_time():
     assert tau == pytest.approx(0.5)
 
 
+def test_dense_branch_uses_algebraic_lambda2_on_bipartite_graphs():
+    # path 0-1-2-3 is bipartite, so its spectrum is symmetric about zero; the
+    # second largest algebraic eigenvalue must come out positive, not -1.
+    adj = sparse.csr_matrix(
+        ([1.0] * 6, ([0, 1, 1, 2, 2, 3], [1, 0, 2, 1, 3, 2])), shape=(4, 4)
+    )
+    dense = np.asarray(adj.todense())
+    root = np.sqrt(dense.sum(axis=1))
+    expected = np.linalg.eigvalsh(dense / root[:, None] / root[None, :])[-2]
+    lambda2, tau = relaxation_time(adj)
+    assert expected > 0
+    assert lambda2 == pytest.approx(expected, abs=1e-9)
+    assert tau == pytest.approx(1.0 / (1.0 - expected), rel=1e-9)
+
+
 def test_ws_with_zero_rewiring_is_a_cycle():
     adj = ws_graph(20, 2, 0.0, seed=1)
     assert adj.nnz == 40

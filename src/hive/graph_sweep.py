@@ -77,9 +77,16 @@ def initial_types_source_room(
     return types
 
 
-def reference_mrd(q: np.ndarray, steps: int) -> np.ndarray:
-    """Deterministic MRD curve from a uniform policy, the well-mixed benchmark."""
-    pi = np.full(q.size, 1.0 / q.size)
+def reference_mrd(
+    q: np.ndarray, steps: int, pi0: np.ndarray | None = None
+) -> np.ndarray:
+    """Deterministic MRD curve, the well-mixed benchmark.
+
+    ``pi0`` defaults to the uniform policy; pass the empirical initial type
+    distribution when the simulated population does not start uniform, so
+    the comparison shares its initial condition.
+    """
+    pi = np.full(q.size, 1.0 / q.size) if pi0 is None else np.asarray(pi0, dtype=float)
     best = int(np.argmax(q))
     curve = np.empty(steps + 1)
     curve[0] = pi[best]
@@ -184,7 +191,6 @@ def simulate_two_room_source(
     N = adj.shape[0]
     source_mask = room_mask(N, source_room)
     target_mask = ~source_mask
-    mrd_curve = reference_mrd(q, steps)
 
     n_curves = ("curves", "source_curves", "target_curves")
     curves = {name: np.zeros((seeds, steps + 1)) for name in n_curves}
@@ -210,6 +216,7 @@ def simulate_two_room_source(
         rng = np.random.default_rng(seed)
         bandit = Bandit(q, delta=delta, rng=rng)
         types = initial_types_source_room(rng, n, N, best, source_mask)
+        mrd_curve = reference_mrd(q, steps, pi0=np.bincount(types, minlength=n) / N)
         overall = curves["curves"][seed]
         source_curve = curves["source_curves"][seed]
         target_curve = curves["target_curves"][seed]

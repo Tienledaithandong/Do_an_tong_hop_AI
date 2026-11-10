@@ -5,7 +5,8 @@ Experiment B (scenario middle, n = 10 types):
 
 - Barabasi-Albert, m = 2  (heavy tail)
 - Barabasi-Albert, m = 5  (milder tail, denser)
-- Erdos-Renyi, mean degree ~ 6 (Poisson tail, sanity anchor)
+- Erdos-Renyi, mean degree ~ 6 (Poisson tail, sanity anchor), conditioned on
+  connectivity so that tau and L mean the same thing as in the main sweep
 
 Writes results/heavy_tail.csv. The calibration line from the main sweep is
 t90 = 44.85 + 3.46 * L, fitted on the 16 non-intervention configurations.
@@ -47,12 +48,26 @@ def to_csr(graph: nx.Graph) -> sparse.csr_matrix:
     )
 
 
+def connected_er(n: int, m: int, seed: int = 0) -> nx.Graph:
+    """ER draw conditioned on connectivity.
+
+    An unconditioned G(n, m) at mean degree 6 is often fragmented; comparing
+    its reachable-pairs-only path length against a calibration fitted on
+    connected graphs would change the meaning of the test.
+    """
+    for attempt in range(seed, seed + 1000):
+        graph = nx.gnm_random_graph(n, m, seed=attempt)
+        if nx.is_connected(graph):
+            return graph
+    raise RuntimeError(f"no connected ER draw in 1000 attempts (n={n}, m={m})")
+
+
 def main() -> int:
     q = make_q(SCENARIO, N_TYPES)
     builders = [
         ("ba_m2", lambda: nx.barabasi_albert_graph(N, 2, seed=0)),
         ("ba_m5", lambda: nx.barabasi_albert_graph(N, 5, seed=0)),
-        ("er_k6", lambda: nx.gnm_random_graph(N, N * 6 // 2, seed=0)),
+        ("er_k6", lambda: connected_er(N, N * 6 // 2, seed=0)),
     ]
 
     rows = []

@@ -195,7 +195,9 @@ report/            report.md (nguồn) và report.pdf (tự động sinh)
 - `t90` dùng trung bình trượt 5 bước với đệm biên bằng giá trị đầu/cuối,
   tránh việc các seed đạt ngưỡng sát cuối cửa sổ bị đánh dấu censored.
 - `relaxation_time` dùng nhánh dense cho `n <= 512` và `eigsh(which="LA")`
-  cho `n > 512`, nên đúng cả với đồ thị bipartite.
+  cho `n > 512`, nên trả về `λ₂` đại số (không phải `-1`) cả với đồ thị
+  bipartite. `τ` là spectral gap (lazy walk trộn trong khoảng `2τ`), không
+  bảo đảm trộn cho bước đi không lazy tuần hoàn trên đồ thị hai phía.
 - Kết quả trong báo cáo được sinh từ cùng một lần chạy với seed cố định;
   chạy lại có thể lệch ở mức làm tròn nhưng các kết luận định tính giữ nguyên.
 - `results/`, `figures/` và `report/report.pdf` là đầu ra tự động sinh và

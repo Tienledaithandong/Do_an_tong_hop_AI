@@ -1,12 +1,48 @@
 import numpy as np
+import pytest
 
 from hive.bandit import make_q
 from hive.graph_sweep import (
     initial_types_source_room,
+    reference_mrd,
     room_mask,
     simulate_two_room_source,
 )
 from hive.graphs import two_room_graph
+
+
+def test_reference_mrd_honours_a_non_uniform_initial_policy():
+    q = make_q("middle", 5)
+    best = int(np.argmax(q))
+    pi0 = np.zeros(5)
+    pi0[best] = 0.05
+    pi0[(best + 1) % 5] = 0.95
+    curve = reference_mrd(q, steps=20, pi0=pi0)
+    assert curve[0] == pytest.approx(0.05)
+    assert curve[-1] > curve[0]
+
+
+def test_source_room_mrd_baseline_shares_the_initial_condition(monkeypatch):
+    import hive.graph_sweep as gs
+
+    seen = []
+    real = gs.reference_mrd
+
+    def spy(q, steps, pi0=None):
+        seen.append(pi0)
+        return real(q, steps, pi0=pi0)
+
+    monkeypatch.setattr(gs, "reference_mrd", spy)
+    N, n = 40, 5
+    q = make_q("middle", n)
+    result = gs.simulate_two_room_source(
+        two_room_graph(N, bridge=3, seed=0), q, steps=10, seeds=2, n_types=n
+    )
+    assert len(seen) == 2
+    for seed, pi0 in enumerate(seen):
+        assert pi0 is not None
+        assert pi0.sum() == pytest.approx(1.0)
+        assert pi0[int(np.argmax(q))] == pytest.approx(result["curves"][seed, 0])
 
 
 def test_source_initializer_keeps_best_out_of_the_target_room():

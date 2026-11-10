@@ -24,6 +24,17 @@ def _sample_rows(weights: np.ndarray, types: np.ndarray, rng: np.random.Generato
     return new
 
 
+def _sample_neighbours(n: int, M: int, rng: np.random.Generator) -> np.ndarray:
+    """Uniform ``M`` distinct neighbours per row, excluding the row itself.
+
+    The indices of the ``M`` smallest i.i.d. keys form a uniform ``M``-subset;
+    setting the diagonal to infinity removes the focal individual exactly.
+    """
+    keys = rng.random((n, n))
+    keys[np.arange(n), np.arange(n)] = np.inf
+    return np.argpartition(keys, M - 1, axis=1)[:, :M]
+
+
 def well_mixed_voter(
     types: np.ndarray,
     rewards: np.ndarray,
@@ -35,7 +46,8 @@ def well_mixed_voter(
 
     ``M`` is the neighbourhood size. ``None`` (or ``M >= N - 1``) means the
     whole population, with the focal individual excluded exactly as in the
-    paper's Eq. (B8).
+    paper's Eq. (B8). A finite ``M`` draws ``M`` distinct neighbours uniformly
+    without replacement, again excluding the focal individual.
     """
     types = np.asarray(types, dtype=int)
     rewards = np.asarray(rewards, dtype=float)
@@ -50,10 +62,9 @@ def well_mixed_voter(
         weights = np.tile(global_votes, (n, 1)) - rewards[:, None] * onehot
         weights = np.clip(weights, 0.0, None)
     else:
-        idx = rng.integers(0, n, size=(n, M))
-        own = np.arange(n)[:, None]
-        clash = idx == own
-        idx[clash] = (idx[clash] + 1) % n
+        if M < 1:
+            raise ValueError("M must be at least 1")
+        idx = _sample_neighbours(n, M, rng)
         weights = np.zeros((n, n_types))
         np.add.at(
             weights,
