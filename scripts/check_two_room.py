@@ -29,6 +29,7 @@ from hive.graph_sweep import simulate_two_room_source
 from hive.graphs import average_path_length, degree_stats, relaxation_time, two_room_graph
 from hive.metrics import rmst
 from hive.plots import plot_two_room_source
+from hive.provenance import write_metadata
 
 RESULTS = ROOT / "results"
 FIGURES = ROOT / "figures"
@@ -150,6 +151,11 @@ def main() -> None:
     summary.to_csv(RESULTS / "two_room_source_summary.csv", index=False)
 
     paths = plot_two_room_source(df, curves, FIGURES)
+    write_metadata(
+        RESULTS, "custom", vars(args), name="two_room_source_metadata",
+        extra={"graph_seed": 0, "swarm_rng": "default_rng(seed), seed=0..seeds-1; reused across bridges", "bootstrap_seed": 0, "n_boot": 800},
+        artifacts=[RESULTS / "two_room_source.csv", RESULTS / "two_room_source_summary.csv", *paths],
+    )
     print(f"[two-room source] {time.time() - started:.1f}s")
     print(
         summary[

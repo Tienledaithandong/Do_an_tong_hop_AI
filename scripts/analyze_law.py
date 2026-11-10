@@ -19,6 +19,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from hive.analysis import law_diagnostics
 from hive.plots import config_summary
+from hive.provenance import write_metadata
 
 RESULTS = ROOT / "results"
 
@@ -38,8 +39,12 @@ def main() -> None:
     summary = config_summary(df)
     diag = law_diagnostics(summary, n_boot=args.bootstrap)
     diag["source"] = path.name
-    out = RESULTS / "law_diagnostics.json"
+    out = path.parent / "law_diagnostics.json"
     out.write_text(json.dumps(diag, ensure_ascii=False, indent=2), encoding="utf-8")
+    write_metadata(
+        out.parent, "analysis", {"n_boot": args.bootstrap, "bootstrap_seed": 0},
+        name="law_diagnostics_metadata", inputs=[path], artifacts=[out],
+    )
 
     print(f"n = {diag['n']} cấu hình")
     print(f"t90 = {diag['intercept']:.2f} + {diag['slope']:.2f} * L, R² = {diag['r2']:.3f}")

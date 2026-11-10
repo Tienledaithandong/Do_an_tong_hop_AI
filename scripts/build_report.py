@@ -8,6 +8,7 @@ and numbered lists, fenced code, pipe tables, images and the inline **bold**,
 from __future__ import annotations
 
 import re
+import sys
 from pathlib import Path
 
 from PIL import Image as PILImage
@@ -30,6 +31,10 @@ from reportlab.platypus import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+
+from hive.provenance import write_metadata
+
 SOURCE = ROOT / "report" / "report.md"
 TARGET = ROOT / "report" / "report.pdf"
 
@@ -134,8 +139,9 @@ def inline(text: str) -> str:
 
     def code_span(match: re.Match[str]) -> str:
         body = match.group(1)
-        # DejaVu Mono lacks subscript digits; keep the body font for those.
-        if any(char in SUBSCRIPT_DIGITS for char in body):
+        # Use the body font when Mono lacks a glyph, including Vietnamese accents.
+        glyphs = pdfmetrics.getFont("Mono").face.charToGlyph
+        if any(not glyphs.get(ord(char)) for char in body):
             return f'<font name="{FAMILY}">{body}</font>'
         return f'<font name="Mono" size="9">{body}</font>'
 
@@ -258,6 +264,7 @@ def build() -> Path:
     register_fonts()
     styles = build_styles()
     story: list = []
+    image_paths: list[Path] = []
     page_width = A4[0] - 4.4 * cm
 
     def make_table(rows: list[list[str]]) -> Table:
@@ -336,6 +343,7 @@ def build() -> Path:
             path = ROOT / "report" / rel
             if not path.exists():
                 path = ROOT / rel
+            image_paths.append(path)
             with PILImage.open(path) as image:
                 width_px, height_px = image.size
             width = page_width
@@ -375,6 +383,10 @@ def build() -> Path:
         canvas.restoreState()
 
     doc.build(story, onFirstPage=footer, onLaterPages=footer)
+    write_metadata(
+        TARGET.parent, "full", {"font_family": FAMILY, "page_size": "A4"},
+        name="report_metadata", inputs=[SOURCE, *image_paths], artifacts=[TARGET],
+    )
     return TARGET
 
 

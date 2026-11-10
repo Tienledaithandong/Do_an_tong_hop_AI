@@ -39,6 +39,7 @@ from hive.bridge import (
 )
 from hive.config import TWO_ROOM_SPARSE
 from hive.plots import plot_two_room_sparse
+from hive.provenance import write_metadata
 
 RESULTS = ROOT / "results"
 PREDICTORS = ["phi", "phi_vol", "phi_deg", "tau"]
@@ -132,6 +133,13 @@ def main() -> None:
             )
         sparse_df = pd.concat(frames, ignore_index=True)
         sparse_df.to_csv(sparse_path, index=False)
+        write_metadata(
+            RESULTS, "quick" if args.quick else "full",
+            {**cfg, "graph_seeds": args.graph_seeds or cfg["graph_seeds"], "seeds": args.seeds or cfg["seeds"], "n_types": 10, "scenario": "middle", "delta": 0.1, "source_room": 0},
+            suffix=suffix, name="two_room_sparse_metadata",
+            extra={"graph_rng": "graph_seed=0..graph_seeds-1 per cell", "swarm_rng": "default_rng(seed), seed=0..seeds-1; reused across cells and graphs"},
+            artifacts=[sparse_path],
+        )
 
     if not clique_path.exists():
         raise SystemExit(
@@ -148,9 +156,17 @@ def main() -> None:
         json.dumps(fits, indent=2), encoding="utf-8"
     )
 
+    figs = []
     if not args.quick:
         figs = plot_two_room_sparse(summary, ROOT / "figures")
         print("  wrote", ", ".join(p.name for p in figs))
+    write_metadata(
+        RESULTS, "quick" if args.quick else "full",
+        {"summary_n_boot": 1000, "fit_n_boot": 300, "bootstrap_seed": 0},
+        suffix=suffix, name="two_room_sparse_fits_metadata",
+        inputs=[sparse_path, clique_path],
+        artifacts=[RESULTS / f"two_room_sparse_summary{suffix}.csv", RESULTS / f"two_room_sparse_fits{suffix}.json", *figs],
+    )
 
     cols = [
         "N",

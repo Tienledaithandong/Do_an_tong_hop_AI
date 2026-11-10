@@ -45,6 +45,7 @@ from hive.graphs import (
 )
 from hive.metrics import THRESHOLD_METHODS, rmst, threshold_time
 from hive.plots import config_summary, fit_law, plot_threshold_sensitivity
+from hive.provenance import write_metadata
 
 RESULTS = ROOT / "results"
 FIGURES = ROOT / "figures"
@@ -192,6 +193,13 @@ def main() -> None:
     )
     summaries = {m: law_table[law_table["method"] == m] for m in THRESHOLD_METHODS}
     paths = plot_threshold_sensitivity(summaries, fits, two_room, FIGURES, suffix)
+    write_metadata(
+        RESULTS, mode,
+        {"law": {**graph, "ws_p": ws_p, "rgg_c": rgg_c, "ws_k": 6}, "two_room": tr, "n": n, "scenario": scenario, "delta": delta, "methods": list(THRESHOLD_METHODS), "window": 5},
+        suffix=suffix, name="threshold_sensitivity_metadata",
+        extra={"graph_seed": 0, "swarm_rng": "default_rng(seed), seed=0..seeds-1; reused across configurations and definitions"},
+        artifacts=[RESULTS / f"threshold_sensitivity_law{suffix}.csv", RESULTS / f"threshold_sensitivity_two_room{suffix}.csv", RESULTS / f"threshold_sensitivity_fit{suffix}.json", *paths],
+    )
 
     print(f"[threshold sensitivity/{mode}] {time.time() - started:.1f}s")
     print("Law fits (t90 = intercept + slope * L):")

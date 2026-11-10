@@ -1,11 +1,9 @@
 """Multi-graph-seed calibration of the ``t90 ~ L`` law.
 
-The headline law was fit on a single graph per configuration (seed=0), so its
-bootstrap CI only captured swarm-seed noise on that one graph. This sweep
-redraws ``graph_seeds`` graphs per configuration and runs ``seeds`` swarm seeds
-on each, then reports a hierarchical bootstrap CI that resamples graphs within
-config and (t90, hit) pairs within graph. RGG draws are rejection-conditioned on
-connectivity so every calibration point is a connected graph.
+The headline diagnostics resample configuration points from one graph each.
+This sweep instead resamples graphs and trajectories within a fixed config set:
+it answers a different uncertainty question. RGG draws are conditioned on
+connectivity; the per-graph statistic is a hit-only median.
 
 Swarm seeds are offset per (config, graph) so every trajectory is independent
 (review #4). Deterministic topologies (complete, WS p=0) are run as a single
@@ -47,6 +45,7 @@ from hive.graphs import (
 )
 from hive.metrics import rmst
 from hive.plots import plot_graph_seeds
+from hive.provenance import write_metadata
 
 RESULTS = ROOT / "results"
 FIGURES = ROOT / "figures"
@@ -75,7 +74,8 @@ def main() -> None:
     parser.add_argument("--quick", action="store_true", help="small smoke run")
     parser.add_argument("--n-boot", type=int, default=500)
     args = parser.parse_args()
-    cfg = GRAPH_SEEDS["quick" if args.quick else "full"]
+    run_mode = "quick" if args.quick else "full"
+    cfg = GRAPH_SEEDS[run_mode]
     suffix = "_quick" if args.quick else ""
 
     N, steps = cfg["N"], cfg["steps"]
@@ -175,12 +175,24 @@ def main() -> None:
     law["graphs_dropped_low_hit"] = int(dropped)
     with open(RESULTS / f"graph_seeds_law{suffix}.json", "w", encoding="utf-8") as fh:
         json.dump(law, fh, ensure_ascii=False, indent=2)
-
     paths = plot_graph_seeds(graphs_df, law, FIGURES, suffix=suffix)
+    write_metadata(
+        RESULTS, run_mode, {"delta": 0.1, "ws_k": 6, **cfg}, suffix=suffix,
+        extra={
+            "n_boot": args.n_boot, "bootstrap_seed": 0,
+            "swarm_rng": "default_rng(seed_offset + seed); consecutive disjoint blocks per config and graph",
+            "swarm_seed_start": 0, "swarm_seed_stop_exclusive": seed_offset,
+            "ws_graph_seeds": list(range(G)),
+            "rgg_draws": "first connected draw from graph_seed*1000 to graph_seed*1000+999; actual draw_seed in summary CSV",
+            "deterministic_graphs": ["complete:1", "ws:0"],
+        },
+        name="graph_seeds_metadata",
+        artifacts=[RESULTS / f"graph_seeds{suffix}.csv", RESULTS / f"graph_seeds_summary{suffix}.csv", RESULTS / f"graph_seeds_t90{suffix}.npz", RESULTS / f"graph_seeds_law{suffix}.json", *paths],
+    )
     n_det = int(graphs_df["deterministic"].sum())
     print(
         f"[graph-seeds] {time.time() - started:.1f}s, "
-        f"{len(graphs_df)} distinct graphs ({n_det} deterministic), "
+        f"{len(graphs_df)} graph samples ({n_det} deterministic), "
         f"{len(seeds_df)} independent runs"
     )
     if "slope" in law:

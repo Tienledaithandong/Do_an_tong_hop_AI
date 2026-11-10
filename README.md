@@ -6,7 +6,9 @@ tiếp cố định để xem cấu trúc đồ thị thay đổi tốc độ h�
 
 ## Cài đặt
 
-Yêu cầu Python 3.10+.
+Code khai báo Python 3.10+ với dependency tối thiểu trong `requirements.txt`
+(và `pyproject.toml`). Để tái lập môi trường đã kiểm thử, dùng **Python 3.13**
+và bộ phiên bản cố định trong `requirements-lock.txt`:
 
 ```bash
 python -m venv .venv
@@ -15,11 +17,15 @@ python -m venv .venv
 # Linux / macOS
 source .venv/bin/activate
 
-pip install -r requirements.txt
+python -m pip install -r requirements-lock.txt
+python -m pip check
 ```
 
-> `requirements.txt` is mirrored in `pyproject.toml`; project metadata
-> (name, version, Python requirement) lives in `pyproject.toml`.
+Bộ pin hiện cần Python >= 3.12 (do NumPy/SciPy), không dùng được cho Python
+3.10–3.11. Với các bản Python đó, dùng `python -m pip install -r requirements.txt`;
+đó là môi trường theo ràng buộc tối thiểu, **không** phải bộ phiên bản đã khóa.
+Metadata ghi phiên bản thực dùng để đối chiếu. Trên Windows, nếu terminal không
+hỗ trợ tiếng Việt, đặt `PYTHONIOENCODING=utf-8` trước khi chạy.
 
 ## Chạy thí nghiệm
 
@@ -38,7 +44,15 @@ python scripts/run_all.py --only graph
 python scripts/run_all.py --only graph --replot
 ```
 
-Kết quả ghi vào `results/`, hình ghi vào `figures/`.
+Chế độ đầy đủ ghi vào `results/` và `figures/`; `run_all.py --quick` chỉ ghi
+vào `results/quick/` và `figures/quick/`. Các script `check_*` có `--quick`
+dùng hậu tố `_quick`, không ghi đè đầu ra đầy đủ. Không có `--quick` ở
+`check_heavy_tail.py` và `check_two_room.py`.
+
+Vẽ lại cũng chọn đúng chế độ: `run_all.py --quick --replot` đọc dữ liệu quick,
+không mô phỏng lại. Chẩn đoán quick dùng
+`python scripts/analyze_law.py --input results/quick/graph_sweep.csv`; JSON được
+ghi cạnh CSV đầu vào, không đè `results/law_diagnostics.json` đầy đủ.
 
 Kiểm tra bổ sung trên mạng đuôi nặng (Bảng 2 trong báo cáo):
 
@@ -54,7 +68,9 @@ python scripts/check_two_room.py      # ~30 s; ghi results/two_room_source*.csv 
 python scripts/analyze_law.py         # ghi results/law_diagnostics.json
 ```
 
-Hiệu chuẩn quy luật `t90 ~ L` trên nhiều graph seed: **142 graph riêng biệt**
+Hiệu chuẩn quy luật `t90 ~ L` trên nhiều graph seed: **142 mẫu graph**
+(140 lần vẽ ngẫu nhiên, 2 topology tất định; không chứng nhận mọi mẫu ngẫu nhiên
+có ma trận kề khác nhau)
 (10 graph × 30 seed mỗi cấu hình; riêng complete và WS `p = 0` là topology tất
 định nên chạy 1 graph × 300 seed), tổng **4.800 lần chạy** với seed độc lập theo
 từng (cấu hình, graph). Bootstrap phân tầng resample graph trong cấu hình rồi
@@ -167,10 +183,16 @@ kiểm tra:
   và yêu tối thiểu 3 cấu hình; leave-one-family và `seed_offset` độc lập;
 - vòng đời job của web API (tạo, chạy, lấy kết quả, trả PNG);
 - validation đầu vào (N, bước, seed, họ đồ thị, tham số) và phục vụ UI tĩnh;
-- endpoint `/api/results`, `/api/law` và chặn tên tệp ngoài danh sách cho phép.
+- endpoint `/api/results`, `/api/law` và chặn tên tệp ngoài danh sách cho phép;
+- quick không đè full; replot không mô phỏng lại hoặc sửa dữ liệu/sidecar gốc;
+- metadata cấu hình, phiên bản và hash source/đầu vào/đầu ra;
+- inventory/checksum của ZIP, phát hiện sửa byte và coverage sai, không ghi đè ZIP.
 
-Một test tích hợp dùng `N` nhỏ và vài seed nên toàn bộ bộ test vẫn chạy
-trong khoảng vài giây.
+Test tích hợp dùng `N` nhỏ và vài seed. Workflow `.github/workflows/tests.yml`
+được cấu hình cho Ubuntu/Windows với Python 3.13, dependency khóa và GitHub
+Actions pin theo commit SHA: `pip check`, pytest, pipeline quick và đóng gói/
+xác minh quick. CI không chạy toàn bộ sweep đầy đủ hoặc chứng nhận số liệu
+trong báo cáo; thời gian test phụ thuộc máy.
 
 ## Dựng báo cáo PDF
 
@@ -198,10 +220,11 @@ src/hive/          thư viện mô phỏng
   hetero.py        buồng không đều: vị trí đầu cầu (hub/lá), Σ 1/bậc đầu cầu
   plots.py         hình cho báo cáo
   config.py        cấu hình chung (RUN_ALL, HEAVY_TAIL, TWO_ROOM_SOURCE, GRAPH_SEEDS)
+  provenance.py    config, seed, phiên bản, git và SHA256 cho artifact mới
   webapp.py        server cục bộ + job runner + API + biểu đồ cho UI
   ui/              index.html, styles.css, app.js (không CDN)
 scripts/           pipeline, kiểm tra đuôi nặng, hai buồng, chẩn đoán,
-                   dựng PDF, chạy UI
+                   dựng PDF, chạy UI, package_artifacts.py (ZIP + checksum)
 tests/             kiểm thử đơn vị và tích hợp (gồm web API)
 results/           CSV / NPZ / JSON sinh bởi pipeline (gitignored)
 figures/           hình PNG / PDF (gitignored)
@@ -224,6 +247,75 @@ report/            report.md (nguồn) và report.pdf (tự động sinh)
 | Hình 9, độ nhạy định nghĩa ngưỡng | `check_threshold_sensitivity.py` → `results/threshold_sensitivity_fit.json` |
 | CI / Cook's D / leave-one-out | `analyze_law.py` → `results/law_diagnostics.json` |
 
+## Provenance và gói bảo vệ
+
+Mỗi thí nghiệm mới ghi `*_metadata.json` riêng (quick thêm `_quick`, hoặc nằm
+trong thư mục quick): cấu hình thực dùng, lịch seed trong `extra`, timestamp UTC,
+Python/thư viện, git SHA/dirty và SHA256 của source cùng đầu vào/đầu ra.
+`run_all.py` ghi `reproduction_metadata.json` và `graph_sweep_metadata.json`.
+Không dùng một sidecar “latest run” chung cho các thí nghiệm khác nhau.
+
+- `--replot` giữ dữ liệu và metadata mô phỏng, ghi `*_render_metadata.json`.
+- `--refit` giữ metadata mô phỏng, ghi `*_fits_metadata.json` với hash CSV đầu vào.
+- Dựng PDF ghi `report/report_metadata.json` với hash Markdown, hình và PDF.
+- Dữ liệu đầy đủ lịch sử chưa có metadata sản xuất **không được hồi tố** bằng
+  config/code hiện tại. Chạy lại thí nghiệm đầy đủ mới tạo được provenance mới.
+- Seed ở một số thí nghiệm được dùng lại giữa các ô; metadata mô tả điều này.
+  Chỉ sweep nhiều graph hiện dùng block swarm seed không trùng giữa các ô/graph.
+
+```bash
+# Đóng gói snapshot đầy đủ hiện có; phải dựng PDF trước
+python scripts/build_report.py
+python scripts/package_artifacts.py --output out/defense-full.zip
+python scripts/package_artifacts.py --verify out/defense-full.zip
+
+# Gói kiểm tra nhanh, không lẫn kết quả đầy đủ
+python scripts/run_all.py --quick
+python scripts/package_artifacts.py --quick --output out/defense-quick.zip
+python scripts/package_artifacts.py --verify out/defense-quick.zip
+```
+
+Bỏ `--output` để tên ZIP tự có timestamp; tên đã tồn tại sẽ bị từ chối thay vì
+bị ghi đè. ZIP gồm source/test, dependency, cấu hình CI, README, nguồn báo cáo,
+dữ liệu/hình theo chế độ; PDF báo cáo chỉ ở gói full. Không đóng gói `.env`,
+venv, file scratch, ZIP cũ hay PDF/source upstream.
+
+`manifest.json` chứa inventory, số byte, SHA256 và `provenance_coverage`:
+artifact có hash khớp sidecar, artifact chưa quy thuộc, và sidecar có hash đầu ra
+lỗi thời. `dependency_drift` báo riêng hash source/đầu vào lệch hoặc thiếu
+trong ZIP; không sửa sidecar cũ hoặc phủ nhận rằng hash đầu ra vẫn khớp.
+ZIP có thêm `.zip.sha256`; lệnh verify tính lại inventory, byte/hash, coverage,
+dependency drift và hash ZIP nếu sidecar có mặt, không giải nén. Hash đầu ra
+khớp **không** khẳng định source/đầu vào lịch sử trùng source đang đóng trong ZIP. Gói full có thể tổng hợp nhiều lần chạy; cảnh báo thiếu metadata là
+chủ ý, không phải chứng nhận mọi kết quả do source hiện tại tạo ra.
+
+Checksum chứng minh tính toàn vẹn byte so với manifest/sidecar, không phải chữ
+ký tác giả, bằng chứng tính đúng khoa học hay kiểm định tái lập số học. Muốn
+đối chiếu số liệu đầy đủ, chạy lại các lệnh trong bảng đầu ra và so metadata,
+config cùng thống kê; không lấy gói quick làm kết quả bảo vệ.
+
+## Đối chiếu upstream và giấy phép
+
+Nguồn tham chiếu: [MISTLab/HiveMindRL](https://github.com/MISTLab/HiveMindRL),
+revision `f24851db0a76e6bb2f917f7f7759ccd79476e7a3` ngày 26/10/2026; chưa xác nhận
+đây là publication snapshot. Bảng chi tiết nằm ở §3.4 của `report/report.md`.
+
+| Nội dung | Upstream được đối chiếu | Đồ án |
+|---|---|---|
+| Phạm vi | NumPy/PyTorch, streaming/parallel RL, nhiều luật và môi trường | NumPy/SciPy, P-CL/P-MCL, TRD/MRD, blind weighted voter |
+| Thí nghiệm song song | Notebook: 150 bước, 1000 lần chạy; paper Table 1: 1000 iteration | 300 bước, 100 seed; không phải chạy lại toàn bộ upstream |
+| Bandit/thời gian | Không clipping; đường ghi trước cập nhật | Clipping (không tác động cấu hình middle); đường `steps+1`, MRD Euler `dt=1` |
+| Đồ thị | Lân cận lấy lại ngẫu nhiên | Đồ thị cố định, gieo nguồn và chẩn đoán cấu trúc là phần mở rộng |
+
+Sai lệch 0,018 là so sánh P-MCL–MRD bên trong cài đặt này, **không** phải kết quả
+chạy upstream-versus-local trên cùng mẫu. Fisher–KPP, vận tốc mặt trận không đổi
+và xác suất trụ của từng lần xâm nhập là giả thuyết, không phải phép đo đã có.
+
+Bài báo mang CC BY 4.0 với các ngoại lệ; repository upstream tại revision trên
+không có giấy phép code rõ ràng. Không suy giấy phép code từ giấy phép bài báo.
+Chưa thêm `LICENSE` địa phương vì chủ sở hữu chưa chọn phạm vi/giấy phép cho
+đóng góp của họ; gói này không cấp lại quyền cho tài liệu hoặc code bên thứ ba.
+
 ## Ghi chú
 
 - `t90` mặc định đọc lần vượt ngưỡng đầu tiên của **trung bình trượt đối xứng
@@ -239,15 +331,20 @@ report/            report.md (nguồn) và report.pdf (tự động sinh)
   trần mô phỏng khi phần lớn seed không đạt ngưỡng.
 - `check_graph_seeds.py` dùng bootstrap phân tầng (resample graph trong cấu
   hình, rồi cặp `(t90, hit)` trong graph) để CI của độ dốc phản ánh cả biến thiên
-  giữa các graph, không chỉ nhiễu seed trên một graph cố định như `analyze_law.py`.
+  giữa các graph và swarm seed trong tập cấu hình cố định. `analyze_law.py`
+  resample các điểm cấu hình của mẫu một graph, nên đo một câu hỏi khác;
+  không thể quy chênh lệch bề rộng hai CI hoàn toàn cho nhiễu vẽ graph.
   Censoring được xử lý trong từng resample; seed độc lập theo (cấu hình, graph);
   topology tất định (complete, WS `p = 0`) tính là một graph. CI điều kiện hoá
   trên tập cấu hình cố định — độ nhạy theo họ xem `leave_one_family_out`.
 - `relaxation_time` dùng nhánh dense cho `n <= 512` và `eigsh(which="LA")`
   cho `n > 512`, nên trả về `λ₂` đại số (không phải `-1`) cả với đồ thị
-  bipartite. `τ` là spectral gap (lazy walk trộn trong khoảng `2τ`), không
-  bảo đảm trộn cho bước đi không lazy tuần hoàn trên đồ thị hai phía.
-- Kết quả trong báo cáo được sinh từ cùng một lần chạy với seed cố định;
-  chạy lại có thể lệch ở mức làm tròn nhưng các kết luận định tính giữ nguyên.
-- `results/`, `figures/` và `report/report.pdf` là đầu ra tự động sinh và
-  đã được `.gitignore`, nên không bị commit vào repository.
+  bipartite. `τ` là thời gian relaxation từ spectral gap; lazy walk có
+  relaxation `2τ`, không phải bảo đảm thời gian trộn `2τ`. Bước đi không lazy
+  vẫn có thể tuần hoàn trên đồ thị hai phía.
+- Kết quả trong báo cáo đến từ nhiều thí nghiệm và lần chạy, không phải một
+  snapshot duy nhất. Seed cố định giúp tái lập trong cùng môi trường; thay
+  phiên bản thư viện hoặc code có thể đổi đồ thị và số liệu, nên cần đối chiếu
+  metadata và checksum thay vì mặc định các kết luận luôn giữ nguyên.
+- `results/`, `figures/`, `out/`, PDF báo cáo và sidecar PDF là đầu ra
+  tự động sinh đã được `.gitignore`; muốn chia sẻ dữ liệu đầy đủ, dùng ZIP.

@@ -29,6 +29,7 @@ from hive.bandit import make_q
 from hive.config import HEAVY_TAIL
 from hive.graphs import average_path_length, degree_stats, relaxation_time
 from hive.graph_sweep import simulate_on_graph
+from hive.provenance import write_metadata
 
 N = HEAVY_TAIL["n"]
 STEPS = HEAVY_TAIL["steps"]
@@ -116,6 +117,12 @@ def main() -> int:
     out = ROOT / "results" / "heavy_tail.csv"
     out.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(rows).to_csv(out, index=False)
+    write_metadata(
+        out.parent, "full", {"delta": 0.1, "networks": ["ba_m2", "ba_m5", "er_k6"], **HEAVY_TAIL},
+        name="heavy_tail_metadata",
+        extra={"graph_seed": 0, "er_draws": "first connected G(n,m) among seeds 0..999", "swarm_rng": "default_rng(seed), seed=0..seeds-1; reused across networks"},
+        artifacts=[out],
+    )
     print("wrote", out)
     return 0
 

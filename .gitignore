@@ -22,3 +22,4 @@ figures/
 
 # Final report deliverable (regeneratable via scripts/build_report.py)
 report/report.pdf
+report/report_metadata.json

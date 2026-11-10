@@ -32,6 +32,7 @@ from hive.bridge import (
 )
 from hive.config import TWO_ROOM_REPLICATES
 from hive.plots import plot_two_room_replicates
+from hive.provenance import write_metadata
 
 RESULTS = ROOT / "results"
 
@@ -101,15 +102,30 @@ def main() -> None:
         summary = summarise(df)
         df.to_csv(RESULTS / f"two_room_replicates{suffix}.csv", index=False)
         summary.to_csv(RESULTS / f"two_room_replicates_summary{suffix}.csv", index=False)
+        write_metadata(
+            RESULTS, "quick" if args.quick else "full",
+            {**cfg, "graph_seeds": args.graph_seeds or cfg["graph_seeds"], "seeds": args.seeds or cfg["seeds"], "n_types": 10, "scenario": "middle", "delta": 0.1, "source_room": 0},
+            suffix=suffix, name="two_room_replicates_metadata",
+            extra={"graph_rng": "graph_seed=0..graph_seeds-1 per cell", "swarm_rng": "default_rng(seed), seed=0..seeds-1; reused across cells and graphs", "summary_n_boot": 1000, "bootstrap_seed": 0},
+            artifacts=[RESULTS / f"two_room_replicates{suffix}.csv", RESULTS / f"two_room_replicates_summary{suffix}.csv"],
+        )
 
     fits = compute_fits(summary, df)
     (RESULTS / f"two_room_replicates_fits{suffix}.json").write_text(
         json.dumps(fits, indent=2), encoding="utf-8"
     )
 
+    figs = []
     if not args.quick:
         figs = plot_two_room_replicates(summary, ROOT / "figures")
         print("  wrote", ", ".join(p.name for p in figs))
+    write_metadata(
+        RESULTS, "quick" if args.quick else "full",
+        {"operation": "refit" if args.refit else "fit", "fit_n_boot": 300, "bootstrap_seed": 0},
+        suffix=suffix, name="two_room_replicates_fits_metadata",
+        inputs=[RESULTS / f"two_room_replicates{suffix}.csv", RESULTS / f"two_room_replicates_summary{suffix}.csv"],
+        artifacts=[RESULTS / f"two_room_replicates_fits{suffix}.json", *figs],
+    )
 
     cols = [
         "N",

@@ -36,6 +36,7 @@ from hive.hetero import (
     summarise_hetero,
 )
 from hive.plots import plot_two_room_hetero
+from hive.provenance import write_metadata
 
 RESULTS = ROOT / "results"
 PLACEMENTS = ("random", "hub", "leaf")
@@ -98,6 +99,13 @@ def main() -> None:
             progress=lambda msg: print(f"  [{time.time() - started:6.0f}s] {msg}", flush=True),
         )
         df.to_csv(path, index=False)
+        write_metadata(
+            RESULTS, "quick" if args.quick else "full",
+            {**cfg, "graph_seeds": args.graph_seeds or cfg["graph_seeds"], "seeds": args.seeds or cfg["seeds"], "layouts": build_layouts(cfg["m"]), "n_types": 10, "scenario": "middle", "delta": 0.1, "source_room": 0},
+            suffix=suffix, name="two_room_hetero_metadata",
+            extra={"graph_rng": "graph_seed=0..graph_seeds-1 per cell", "swarm_rng": "default_rng(seed), seed=0..seeds-1; reused across cells and graphs"},
+            artifacts=[path],
+        )
 
     summary = summarise_hetero(df)
     summary.to_csv(RESULTS / f"two_room_hetero_summary{suffix}.csv", index=False)
@@ -105,9 +113,17 @@ def main() -> None:
     (RESULTS / f"two_room_hetero_fits{suffix}.json").write_text(
         json.dumps(fits, indent=2), encoding="utf-8"
     )
+    figs = []
     if not args.quick:
         figs = plot_two_room_hetero(summary, ROOT / "figures")
         print("  wrote", ", ".join(p.name for p in figs))
+    write_metadata(
+        RESULTS, "quick" if args.quick else "full",
+        {"summary_n_boot": 800, "fit_n_boot": 300, "bootstrap_seed": 0},
+        suffix=suffix, name="two_room_hetero_fits_metadata",
+        inputs=[path],
+        artifacts=[RESULTS / f"two_room_hetero_summary{suffix}.csv", RESULTS / f"two_room_hetero_fits{suffix}.json", *figs],
+    )
 
     cols = [
         "layout",
