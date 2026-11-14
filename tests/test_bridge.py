@@ -102,6 +102,28 @@ def test_bootstrap_exponent_brackets_the_slope_on_a_clean_power_law():
     assert lo == pytest.approx(-0.7) and hi == pytest.approx(-0.7)
 
 
+def test_bootstrap_exponent_returns_nan_when_every_seed_is_censored():
+    import pandas as pd
+
+    rows = []
+    for N in (100, 200):
+        for bridge in (1, 2, 4):
+            for graph_seed in range(2):
+                for seed in range(3):
+                    rows.append(
+                        {
+                            "N": N,
+                            "bridge": bridge,
+                            "graph_seed": graph_seed,
+                            "seed": seed,
+                            "t": 601.0,
+                            "hit": False,
+                        }
+                    )
+    lo, hi = bootstrap_exponent(pd.DataFrame(rows), "t", "hit", n_boot=20)
+    assert np.isnan(lo) and np.isnan(hi)
+
+
 def test_run_replicates_shapes_and_summary():
     df = run_replicates({40: 60}, [2, 6], graph_seeds=2, seeds=3, n_types=5)
     assert len(df) == 1 * 2 * 2 * 3

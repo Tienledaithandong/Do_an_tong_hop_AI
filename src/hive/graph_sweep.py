@@ -203,6 +203,7 @@ def simulate_two_room_source(
 
     n_curves = ("curves", "source_curves", "target_curves")
     curves = {name: np.zeros((seeds, steps + 1)) for name in n_curves}
+    mrd_curves = np.zeros((seeds, steps + 1))
     arrays = {
         "t10_target": np.zeros(seeds),
         "t50_target": np.zeros(seeds),
@@ -225,7 +226,7 @@ def simulate_two_room_source(
         rng = np.random.default_rng(seed)
         bandit = Bandit(q, delta=delta, rng=rng)
         types = initial_types_source_room(rng, n, N, best, source_mask)
-        mrd_curve = reference_mrd(
+        mrd_curves[seed] = reference_mrd(
             q, steps, pi0=np.bincount(types, minlength=n) / N, delta=delta
         )
         overall = curves["curves"][seed]
@@ -255,7 +256,7 @@ def simulate_two_room_source(
         arrays["final_target"][seed] = float(target_curve[-tail:].mean())
         counts = np.bincount(types, minlength=n) / N
         arrays["consensus"][seed] = consensus(counts)
-        arrays["l2_mrd"][seed] = l2_to_reference(overall, mrd_curve)
+        arrays["l2_mrd"][seed] = l2_to_reference(overall, mrd_curves[seed])
         if progress is not None:
             progress(seed + 1, seeds)
 
@@ -263,7 +264,7 @@ def simulate_two_room_source(
         **curves,
         **arrays,
         **flags,
-        "mrd": mrd_curve,
+        "mrd": mrd_curves.mean(axis=0),
         "source_mask": source_mask,
         "target_mask": target_mask,
     }

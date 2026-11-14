@@ -2,7 +2,7 @@
 
 **Đồ án tổng hợp — Trí tuệ nhân tạo**
 
-*Cập nhật ngày 10 tháng 11 năm 2026*
+*Cập nhật ngày 14 tháng 11 năm 2026*
 
 ---
 
@@ -183,7 +183,7 @@ Bảng 1 tóm tắt 19 topology liên thông phân biệt. Tổng cộng có 22 
 | hai buồng | cầu = 3 | 10.458 | 1,99 | 47,5 | 1,00 | 1,00 | 1,00 |
 | hai buồng | cầu = 1 | 31.374 | 2,00 | 47,5 | 1,00 | 1,00 | 1,00 |
 
-`p = 10⁻⁴` trùng hoàn toàn với `p = 0` (cùng đồ thị sinh ra) nên chỉ trình bày một lần. `final` là trung vị của `final_best_mass`; cột cuối là tỉ lệ seed có `final_best_mass ≥ 0,95`. Ba dòng hai buồng là can thiệp rỗng: cả hai buồng đã chứa type tốt, nên `t₉₀ = 47,5` đo học cục bộ chứ không đo thời gian thông tin qua cầu.
+`p = 10⁻⁴` trùng hoàn toàn với `p = 0` (cùng đồ thị sinh ra) nên chỉ trình bày một lần. `final` là trung vị của `final_best_mass`; cột cuối là tỉ lệ seed có `final_best_mass ≥ 0,95`. Cột `t₉₀` là trung vị trên **toàn bộ seed**, trong đó seed không đạt ngưỡng (censored) được tính bằng giá trị chặn `steps + 1` — tức trung vị kiểu Kaplan–Meier khi censoring xảy ra ở trần mô phỏng. Đây **không** phải trung vị có điều kiện chỉ trên nhóm seed đạt ngưỡng ( estimand dùng trong bootstrap phân tầng ở §5.3 và trong các bảng hai buồng); hai estimand chênh nhau rõ ở các cấu hình censor một phần, xem §5.3. Ba dòng hai buồng là can thiệp rỗng: cả hai buồng đã chứa type tốt, nên `t₉₀ = 47,5` đo học cục bộ chứ không đo thời gian thông tin qua cầu.
 
 Hình 2 đặt hai thước đo cạnh nhau.
 
@@ -270,6 +270,8 @@ t₉₀ = 46,28 + 3,26 · L,     R² = 0,90
 ```
 
 CI 95% của độ dốc là **2,99–3,51**; CI tung độ gốc 44,9–48,3 và CI của giá trị trung bình trên đường hồi quy tại `L = 2` là 51,8–54,4 (ước lượng 52,8). Độ dốc 3,26 gần với bản một graph (3,46) và `R²` giữ ở ~0,90. Vòng lattice `WS p = 0` — điểm đòn bẩy cao nhất — có median có điều kiện 164 bước trên 300 seed, so với 173,5 bước trên 100 seed ở Bảng 1. Các cấu hình khác cũng thay đổi mẫu graph và lịch seed; chưa có thí nghiệm đối chứng để quy chênh lệch hệ số riêng cho vòng lattice. Biến thiên graph-to-graph đo được lớn nhất ở WS thưa (`p = 10⁻³`: `L` có SD 6,6, `t₉₀` SD 16,2 bước) và nhỏ ở RGG / WS dày (`t₉₀` SD 2–7 bước). **Nhưng phải đọc đúng phạm vi của CI này:** bootstrap phân tầng *điều kiện hoá trên tập 16 cấu hình cố định* — nó đo bất định do vẽ graph và gieo seed trong các cấu hình đã chọn, chứ **không** đo độ nhạy của độ dốc khi thêm/bớt cấu hình hoặc họ đồ thị. Vì hai bootstrap resample những đơn vị khác nhau, không thể quy phần chênh lệch bề rộng CI hoàn toàn cho nhiễu của một lần vẽ graph. Khoảng hẹp mới không giải quyết độ nhạy do chọn tập cấu hình hay sai dạng mô hình; leave-one-family bên dưới là một chẩn đoán bổ sung.
+
+**Khác estimand giữa hai đường hiệu chuẩn.** Hai bản hiệu chuẩn không dùng cùng một ước lượng `t₉₀`. Đường một graph `44,85 + 3,46·L` (Bảng 1, `config_summary`/`fit_law`/`analyze_law`) lấy trung vị trên **toàn bộ seed**, seed censor tính bằng chặn `steps + 1` — tức trung vị kiểu Kaplan–Meier. Bootstrap phân tầng `46,28 + 3,26·L` lại lấy trung vị **chỉ trên nhóm seed đạt ngưỡng** trong mỗi graph (`analysis._collapse_graphs`). Đây là hai estimand hợp lệ nhưng trả lời hai câu hỏi khác nhau, và chúng lệch nhau ở cấu hình censor một phần. Trong 16 cấu hình hiệu chuẩn có **2** cấu hình như vậy: `WS p = 0` (hit-rate 0,90) và `WS p = 10⁻³` (hit-rate 0,96). Trên **cùng 100 seed của Bảng 1**, `WS p = 0` cho trung vị toàn bộ seed 173,5 nhưng trung vị nhóm đạt chỉ 160,0 (chênh **+13,5** bước); `WS p = 10⁻³` là 155,5 so với 153,0 (**+2,5**). Vì `WS p = 0` là điểm đòn bẩy cao nhất (Cook's D = 10, leverage 0,73), riêng việc đổi estimand đã kéo điểm này xuống ~13,5 bước và tự nó làm thay đổi độ dốc. Do đó chênh lệch 3,46 → 3,26 giữa hai đường **gồm cả khác estimand**, không chỉ nhiễu vẽ graph/seed; không nên diễn giải nó như một hiệu chỉnh thuần túy do nhiễu. (Con số 164 bước của `WS p = 0` nêu ở đoạn trên là trung vị nhóm đạt trên 300 seed khác; phần còn lại 160 → 164 mới là do đổi mẫu seed/graph.)
 
 **Độ nhạy theo họ (leave-one-family).** Vì CI phân tầng không trả lời "độ dốc phụ thuộc thế nào vào *những họ nào đang có*", ta khớp lại quy luật sau khi bỏ lần lượt từng họ (`leave_one_family_out`, `results/law_diagnostics.json`): bỏ RGG cho độ dốc 3,30 (`R² = 0,93`), bỏ đầy đủ cho 3,43, bỏ WS cho 3,93 (`R² = 0,86`). Dao động 3,30–3,93 tức ~18% độ dốc headline; bề rộng 0,63 hơi lớn hơn bề rộng 0,52 của CI phân tầng, nhưng hai đại lượng không đo cùng câu hỏi và cũng không dùng cùng bản hiệu chuẩn. Đây là leave-one-family trên **mẫu một graph** (độ dốc đầy đủ 3,46), không phải CI hay refit của mẫu 142 graph. Bỏ WS làm độ dốc tăng, bỏ RGG làm độ dốc giảm: sự phụ thuộc vào tập họ cần được báo cáo thay vì suy ra rằng chỉ các điểm WS dài kéo dốc lên.
 

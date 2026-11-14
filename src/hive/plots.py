@@ -61,6 +61,7 @@ def plot_reproduction(curves: dict[str, np.ndarray], out_dir: Path) -> list[Path
 
 
 def config_summary(df: pd.DataFrame) -> pd.DataFrame:
+    """Per-config summary; ``t90`` is the all-seed (Kaplan–Meier-style) median with censored seeds at the horizon sentinel, unlike the hit-only conditional medians in analysis.py."""
     rows = []
     for (family, param), group in df.groupby(["family", "param"]):
         rows.append(

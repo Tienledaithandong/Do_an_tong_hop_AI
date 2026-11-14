@@ -334,6 +334,11 @@ Chưa thêm `LICENSE` địa phương vì chủ sở hữu chưa chọn phạm v
   giữa các graph và swarm seed trong tập cấu hình cố định. `analyze_law.py`
   resample các điểm cấu hình của mẫu một graph, nên đo một câu hỏi khác;
   không thể quy chênh lệch bề rộng hai CI hoàn toàn cho nhiễu vẽ graph.
+  Hai bản còn khác **estimand**: `config_summary`/`fit_law`/`analyze_law` lấy
+  trung vị `t90` trên toàn bộ seed (censor tính bằng chặn `steps+1`, kiểu
+  Kaplan–Meier), còn bootstrap phân tầng lấy trung vị chỉ trên nhóm seed đạt
+  ngưỡng trong mỗi graph; chênh lệch giữa hai đường hiệu chuẩn gồm cả khác
+  estimand chứ không chỉ nhiễu (xem §5.3 báo cáo).
   Censoring được xử lý trong từng resample; seed độc lập theo (cấu hình, graph);
   topology tất định (complete, WS `p = 0`) tính là một graph. CI điều kiện hoá
   trên tập cấu hình cố định — độ nhạy theo họ xem `leave_one_family_out`.

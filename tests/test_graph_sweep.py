@@ -74,3 +74,29 @@ def test_seed_offset_shifts_the_rng_without_changing_determinism():
     # offset=1, seed 0 is the same RNG stream as offset=0, seed 1.
     d = simulate_on_graph(adj, q, steps=20, seeds=1, n_types=10, seed_offset=1)
     np.testing.assert_allclose(d["curves"][0], a["curves"][1])
+
+
+def test_two_room_source_mrd_is_the_mean_over_seeds(monkeypatch):
+    # The source-room init is deterministic across seeds, so the real MRD
+    # reference is identical per seed and cannot distinguish mean from last.
+    # Patch reference_mrd to return a distinct curve per call to pin the mean.
+    from hive import graph_sweep
+
+    steps, seeds = 5, 3
+    calls = {"n": 0}
+
+    def fake_reference_mrd(q, steps, pi0=None, delta=0.0):
+        calls["n"] += 1
+        return np.full(steps + 1, float(calls["n"]))
+
+    monkeypatch.setattr(graph_sweep, "reference_mrd", fake_reference_mrd)
+    adj = two_room_graph(40, bridge=2, seed=0)
+    res = graph_sweep.simulate_two_room_source(
+        adj, make_q("middle"), steps=steps, seeds=seeds, n_types=10
+    )
+    expected = np.mean(
+        [np.full(steps + 1, float(k)) for k in range(1, seeds + 1)], axis=0
+    )
+    assert calls["n"] == seeds
+    np.testing.assert_allclose(res["mrd"], expected)
+    assert not np.allclose(res["mrd"], np.full(steps + 1, float(seeds)))

@@ -256,6 +256,8 @@ def bootstrap_exponent(
                 ys.append(med)
         if len(xs) >= 3:
             slopes.append(fit_loglog(np.array(xs), np.array(ys))["slope"])
+    if not slopes:
+        return float("nan"), float("nan")
     return float(np.percentile(slopes, 2.5)), float(np.percentile(slopes, 97.5))
 
 
