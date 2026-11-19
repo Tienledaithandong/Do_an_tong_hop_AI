@@ -93,6 +93,10 @@ def test_run_hetero_summary_and_fits():
     summary = summarise_hetero(df, n_boot=30)
     assert len(summary) == 8
     assert (summary["graphs"] == 2).all()
+    assert {
+        "t_first_lo", "t_first_hi", "t_first_graph_only_lo", "t_first_graph_only_hi",
+        "t50_lo", "t50_hi", "t50_graph_only_lo", "t50_graph_only_hi",
+    } <= set(summary.columns)
     hub = summary[summary["target"] == "hub"]["inv_end_target"].mean()
     leaf = summary[summary["target"] == "leaf"]["inv_end_target"].mean()
     assert leaf > hub

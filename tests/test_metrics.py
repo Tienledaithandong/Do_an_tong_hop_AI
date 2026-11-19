@@ -112,6 +112,24 @@ def test_rmst_empty_sample_is_nan():
     assert np.isnan(rmst(np.array([]), np.array([], dtype=bool), horizon=5))
 
 
+def test_rmst_before_first_event_integrates_full_survival():
+    assert rmst(np.array([3.0, 5.0]), np.array([True, False]), horizon=1.0) == pytest.approx(1.0)
+    assert rmst(np.array([3.0, 5.0]), np.array([True, False]), horizon=0.0) == pytest.approx(0.0)
+
+
+@pytest.mark.parametrize("horizon", [-1.0, float("nan"), float("inf")])
+def test_rmst_rejects_invalid_horizons(horizon):
+    with pytest.raises(ValueError, match="horizon"):
+        rmst(np.array([1.0, 2.0]), np.array([True, False]), horizon=horizon)
+
+
+def test_rmst_rejects_mismatched_events_and_invalid_times():
+    with pytest.raises(ValueError, match="same shape"):
+        rmst(np.array([1.0, 2.0]), np.array([True]), horizon=1.0)
+    with pytest.raises(ValueError, match="finite and non-negative"):
+        rmst(np.array([-1.0]), np.array([True]), horizon=1.0)
+
+
 def test_symmetric_smoother_crosses_before_the_raw_signal():
     # Reviewer's example: the centered 5-step average reaches 0.1 at step 1
     # even though the first nonzero value only appears at step 3.

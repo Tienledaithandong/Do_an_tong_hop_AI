@@ -90,22 +90,26 @@ def config_summary(df: pd.DataFrame) -> pd.DataFrame:
     return summary.loc[~key.duplicated()].reset_index(drop=True)
 
 
-def fit_law(summary: pd.DataFrame) -> tuple[float, float, float, int]:
+def fit_law(
+    summary: pd.DataFrame, min_hit_rate: float = 0.5
+) -> tuple[float, float, float, int]:
     """Fit ``t90 = intercept + slope * L`` on non-intervention families.
 
     Two-room graphs are the held-out intervention. Disconnected graphs and
-    configurations whose ``t90`` is censored in more than half of the seeds
-    are excluded when the corresponding columns are present; otherwise the
-    fit would mix a mixing-time proxy with a travel-time proxy.
+    configurations below ``min_hit_rate`` are excluded when the corresponding
+    columns are present; otherwise the fit would mix a mixing-time proxy with
+    a travel-time proxy. The default 0.5 reproduces the report's current rule.
     Returns ``(intercept, slope, r2, n_train)``.
     """
+    if not 0.0 <= min_hit_rate <= 1.0:
+        raise ValueError("min_hit_rate must lie in [0, 1]")
     train = summary[summary["family"] != "two_room"]
     if "connected" in train:
         train = train[train["connected"].astype(bool)]
     if "tau" in train:
         train = train[np.isfinite(pd.to_numeric(train["tau"], errors="coerce"))]
     if "hit_rate" in train:
-        train = train[train["hit_rate"] >= 0.5]
+        train = train[train["hit_rate"] >= min_hit_rate]
     train = train[
         np.isfinite(pd.to_numeric(train["path_length"], errors="coerce"))
         & np.isfinite(pd.to_numeric(train["t90"], errors="coerce"))
@@ -119,6 +123,29 @@ def fit_law(summary: pd.DataFrame) -> tuple[float, float, float, int]:
     total = np.sum((y - y.mean()) ** 2)
     r2 = 1.0 - np.sum((y - predicted) ** 2) / total if total > 0 else float("nan")
     return float(intercept), float(slope), float(r2), int(x.size)
+
+
+def fit_law_sensitivity(
+    summary: pd.DataFrame, thresholds: tuple[float, ...] = (0.0, 0.25, 0.5, 0.75, 1.0)
+) -> list[dict[str, float | int]]:
+    """Refit the scaling law across hit-rate inclusion thresholds.
+
+    This is a selection-sensitivity diagnostic, not a replacement for a
+    censoring-aware model. Each row records the cutoff and number of retained
+    configurations so readers can see whether the fitted slope depends on
+    excluding cells with low empirical hit rates.
+    """
+    rows = []
+    for threshold in thresholds:
+        intercept, slope, r2, n_train = fit_law(summary, min_hit_rate=threshold)
+        rows.append({
+            "min_hit_rate": float(threshold),
+            "intercept": float(intercept),
+            "slope": float(slope),
+            "r2": float(r2),
+            "n_train": int(n_train),
+        })
+    return rows
 
 
 def plot_law(df: pd.DataFrame, out_dir: Path) -> list[Path]:

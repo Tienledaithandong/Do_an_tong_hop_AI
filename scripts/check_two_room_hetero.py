@@ -86,6 +86,8 @@ def main() -> None:
     path = RESULTS / f"two_room_hetero{suffix}.csv"
 
     if args.refit:
+        if not path.is_file():
+            raise SystemExit(f"{path.name} not found; run this script without --refit first")
         df = pd.read_csv(path)
     else:
         cfg = TWO_ROOM_HETERO["quick" if args.quick else "full"]

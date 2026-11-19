@@ -91,7 +91,10 @@ def main() -> None:
     started = time.time()
 
     if args.refit:
-        df = pd.read_csv(RESULTS / f"two_room_replicates{suffix}.csv")
+        raw_path = RESULTS / f"two_room_replicates{suffix}.csv"
+        if not raw_path.is_file():
+            raise SystemExit(f"{raw_path.name} not found; run without --refit first")
+        df = pd.read_csv(raw_path)
         if "hit50_raw" not in df or df["seed"].duplicated().any() or (df.groupby(["N", "bridge"])["graph_seed"].nunique() > 1).any():
             raise SystemExit("Legacy clique CSV has reused seeds or lacks raw crossings; rerun without --refit.")
         summary = summarise(df)

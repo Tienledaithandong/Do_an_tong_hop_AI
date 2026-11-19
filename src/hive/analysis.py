@@ -375,11 +375,20 @@ def correlations(train: pd.DataFrame) -> dict[str, Any]:
 def law_diagnostics(
     summary: pd.DataFrame, n_boot: int = 2000, seed: int = 0
 ) -> dict[str, Any]:
+    # Import locally to keep the statistical core independent of plotting at
+    # module import time while reusing the exact production fit/filter logic.
+    from .plots import fit_law_sensitivity
+
+    sensitivity = fit_law_sensitivity(summary)
     train = law_frame(summary)
     x = _as_float(train["path_length"])
     y = _as_float(train["t90"])
     if x.size < 3:
-        return {"n": int(x.size), "error": "cần ít nhất 3 cấu hình để hiệu chuẩn"}
+        return {
+            "n": int(x.size),
+            "error": "cần ít nhất 3 cấu hình để hiệu chuẩn",
+            "hit_rate_sensitivity": sensitivity,
+        }
     intercept, slope, r2 = _fit_line(x, y)
     boot = bootstrap_law(train, n_boot=n_boot, seed=seed)
     infl = influence(train)
@@ -390,6 +399,16 @@ def law_diagnostics(
     corr = correlations(train)
 
     warnings: list[str] = []
+    sensitivity_slopes = [
+        row["slope"] for row in sensitivity if np.isfinite(row["slope"])
+    ]
+    if len(sensitivity_slopes) >= 2 and abs(slope) > 1e-12:
+        relative_swing = (max(sensitivity_slopes) - min(sensitivity_slopes)) / abs(slope)
+        if relative_swing > 0.5:
+            warnings.append(
+                "Hệ số góc nhạy với ngưỡng hit-rate tối thiểu "
+                f"(biên độ {100 * relative_swing:.0f}% so với fit 50%)."
+            )
     max_cook = max((row["cook"] or 0.0) for row in infl) if infl else 0.0
     if max_cook > 1.0:
         warnings.append(
@@ -443,5 +462,6 @@ def law_diagnostics(
         "family_effect": family,
         "degree_models": degree,
         "correlations": corr,
+        "hit_rate_sensitivity": sensitivity,
         "warnings": warnings,
     }

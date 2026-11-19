@@ -153,14 +153,27 @@ def rmst(times: np.ndarray, events: np.ndarray, horizon: float) -> float:
     differ across conditions: a censored run contributes the full time it was
     observed instead of being dropped.
     """
+    horizon = float(horizon)
+    if not np.isfinite(horizon) or horizon < 0:
+        raise ValueError("horizon must be finite and non-negative")
     times = np.asarray(times, dtype=float)
+    events = np.asarray(events, dtype=bool)
+    if times.shape != events.shape:
+        raise ValueError("times and events must have the same shape")
     if times.size == 0:
         return float("nan")
+    if np.any(~np.isfinite(times)) or np.any(times < 0):
+        raise ValueError("times must be finite and non-negative")
     ts, ss = kaplan_meier(times, events)
     keep = ts <= horizon
-    ts = np.append(ts[keep], horizon)
-    ss = np.append(ss[keep], ss[keep][-1])
-    return float(np.sum(np.diff(ts) * ss[:-1]))
+    knots = ts[keep]
+    survival = ss[keep]
+    # The Kaplan–Meier curve starts at S(0)=1. If the horizon precedes
+    # the first event, the area is simply the full horizon at survival 1.
+    current_survival = float(survival[-1]) if survival.size else 1.0
+    knots = np.append(knots, horizon)
+    survival = np.append(survival, current_survival)
+    return float(np.sum(np.diff(knots) * survival[:-1]))
 
 
 def consensus(pi: np.ndarray) -> float:

@@ -2,6 +2,7 @@
 name = "hivemind-rl"
 version = "0.1.0"
 description = "Reproduction and graph extension of Soma et al. (2026), 'The hive mind is a single reinforcement learning agent'"
+license = {file = "LICENSE"}
 requires-python = ">=3.10"
 dependencies = [
     "numpy>=2.0",
