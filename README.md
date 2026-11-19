@@ -70,6 +70,12 @@ python scripts/check_two_room.py      # ~30 s; ghi results/two_room_source*.csv 
 python scripts/analyze_law.py         # ghi results/law_diagnostics.json
 ```
 
+`law_diagnostics.json` báo thêm `hit_rate_sensitivity`: cùng một hồi quy được
+fit với ngưỡng hit-rate tối thiểu 0, 25, 50, 75 và 100%. Ngưỡng 50% vẫn là
+mặc định của headline; các ngưỡng khác là kiểm tra độ nhạy theo lựa chọn cấu
+hình, không thay thế mô hình censoring-aware. Đọc slope cùng `n_train` để thấy
+nếu kết quả phụ thuộc vào các cấu hình ít lần đạt ngưỡng.
+
 Hiệu chuẩn quy luật `t90 ~ L` trên nhiều graph seed: **142 mẫu graph**
 (140 lần vẽ ngẫu nhiên, 2 topology tất định; không chứng nhận mọi mẫu ngẫu nhiên
 có ma trận kề khác nhau)
@@ -120,6 +126,11 @@ python scripts/check_two_room_hetero.py --quick  # vài giây
 python scripts/check_two_room_hetero.py --refit  # tính lại fit từ CSV đã lưu
 ```
 
+Trong tóm tắt hetero, `t_first_lo/hi` và `t50_lo/hi` là CI bootstrap hai tầng:
+lấy mẫu graph seed rồi quỹ đạo trong từng graph. Các cột
+`*_graph_only_lo/hi` giữ nguyên quỹ đạo trong graph và chỉ lấy mẫu graph, để
+so sánh độ bất định giữa topology với nhiễu Monte Carlo trong từng topology.
+
 Độ nhạy của thời điểm đạt ngưỡng theo định nghĩa phép làm trơn (đối xứng /
 nhân quả / thô): chạy lại các cấu hình của quy luật `t90 ~ L` và thí nghiệm
 gieo nguồn, rồi đo lại ngưỡng trên *cùng* quỹ đạo theo ba định nghĩa để xem
@@ -147,6 +158,13 @@ python scripts/run_ui.py
 # hoặc
 python scripts/run_ui.py --port 9000 --no-browser
 ```
+
+Máy chủ mặc định chỉ bind `127.0.0.1`. Hàng đợi nhận tối đa 8 việc đang chờ,
+và mỗi mô phỏng bị giới hạn ở 40 triệu population-updates ước tính (giảm
+`N`, `steps`, `seeds` hoặc số cấu hình nếu bị từ chối). Không có xác thực:
+bind ra mạng yêu cầu `--allow-remote` rõ ràng, ví dụ
+`python scripts/run_ui.py --host 0.0.0.0 --allow-remote`; chỉ làm vậy trong
+mạng tin cậy và không chuyển tiếp cổng ra Internet.
 
 Mở `http://127.0.0.1:8765/`. Giao diện là một dashboard sáu tab:
 
@@ -202,10 +220,11 @@ kiểm tra:
 - inventory/checksum của ZIP, phát hiện sửa byte và coverage sai, không ghi đè ZIP.
 
 Test tích hợp dùng `N` nhỏ và vài seed. Workflow `.github/workflows/tests.yml`
-được cấu hình cho Ubuntu/Windows với Python 3.13, dependency khóa và GitHub
-Actions pin theo commit SHA: `pip check`, pytest, pipeline quick và đóng gói/
-xác minh quick. CI không chạy toàn bộ sweep đầy đủ hoặc chứng nhận số liệu
-trong báo cáo; thời gian test phụ thuộc máy.
+được cấu hình cho Ubuntu/Windows với Python 3.10, 3.11 và 3.13. Python 3.13
+chạy dependency khóa; 3.10–3.11 cài các floor trong `requirements.txt` để xác
+minh dải `requires-python` khai báo. Các job chạy `pip check`, pytest, pipeline
+quick và đóng gói/xác minh quick. CI không chạy toàn bộ sweep đầy đủ hoặc
+chứng nhận số liệu trong báo cáo; thời gian test phụ thuộc máy.
 
 ## Dựng báo cáo PDF
 
@@ -349,10 +368,11 @@ Sai lệch 0,018 là so sánh P-MCL–MRD bên trong cài đặt này, **không*
 chạy upstream-versus-local trên cùng mẫu. Fisher–KPP, vận tốc mặt trận không đổi
 và xác suất trụ của từng lần xâm nhập là giả thuyết, không phải phép đo đã có.
 
-Bài báo mang CC BY 4.0 với các ngoại lệ; repository upstream tại revision trên
-không có giấy phép code rõ ràng. Không suy giấy phép code từ giấy phép bài báo.
-Chưa thêm `LICENSE` địa phương vì chủ sở hữu chưa chọn phạm vi/giấy phép cho
-đóng góp của họ; gói này không cấp lại quyền cho tài liệu hoặc code bên thứ ba.
+Code gốc do dự án sở hữu được cấp phép theo MIT; xem `LICENSE` (copyright
+notice ghi theo chủ sở hữu GitHub `Tienledaithandong`). Giấy phép này không
+suy rộng từ CC BY 4.0 của bài báo và không cấp lại quyền cho bài báo, code
+upstream hoặc tài liệu/tài sản bên thứ ba; các tài liệu đó giữ nguyên điều khoản
+riêng của chúng.
 
 ## Ghi chú
 

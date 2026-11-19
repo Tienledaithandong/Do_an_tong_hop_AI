@@ -40,6 +40,10 @@ def _initial_types(rng: np.random.Generator, n: int, N: int) -> np.ndarray:
 
 def room_mask(N: int, room: int = 0) -> np.ndarray:
     """Boolean mask for one of the two rooms in ``two_room_graph``."""
+    if isinstance(N, bool) or not isinstance(N, (int, np.integer)) or N < 2:
+        raise ValueError("N must be an integer of at least 2")
+    if isinstance(room, bool) or not isinstance(room, (int, np.integer)) or room not in (0, 1):
+        raise ValueError("room must be 0 (source) or 1 (target)")
     half = N // 2
     mask = np.arange(N) < half
     return mask if room == 0 else ~mask
@@ -58,6 +62,18 @@ def initial_types_source_room(
     the target room starts with *no* copy of the best option, so the bridge
     is the only channel through which it can arrive.
     """
+    if isinstance(n, bool) or not isinstance(n, (int, np.integer)) or n < 2:
+        raise ValueError("n must be an integer of at least 2")
+    if isinstance(N, bool) or not isinstance(N, (int, np.integer)) or N < 2:
+        raise ValueError("N must be an integer of at least 2")
+    if isinstance(best, bool) or not isinstance(best, (int, np.integer)) or not 0 <= best < n:
+        raise ValueError("best must be a valid option index")
+    source_mask = np.asarray(source_mask, dtype=bool)
+    if source_mask.shape != (N,):
+        raise ValueError("source_mask must have shape (N,)")
+    if not source_mask.any() or source_mask.all():
+        raise ValueError("source_mask must select a non-empty proper subset")
+
     target_mask = ~source_mask
     source_idx = np.flatnonzero(source_mask)
     target_idx = np.flatnonzero(target_mask)
@@ -217,7 +233,17 @@ def simulate_two_room_source(
     separate graph draws can use independent trajectories.
     """
     q = np.asarray(q, dtype=float)
+    if q.ndim != 1 or q.size < 2 or not np.all(np.isfinite(q)):
+        raise ValueError("q must be a finite 1D array with at least 2 options")
     n = int(q.size) if n_types is None else n_types
+    if isinstance(n, bool) or not isinstance(n, (int, np.integer)) or n != q.size:
+        raise ValueError("n_types must equal the number of options in q")
+    if isinstance(steps, bool) or not isinstance(steps, (int, np.integer)) or steps < 0:
+        raise ValueError("steps must be a non-negative integer")
+    if isinstance(seeds, bool) or not isinstance(seeds, (int, np.integer)) or seeds < 1:
+        raise ValueError("seeds must be a positive integer")
+    if len(adj.shape) != 2 or adj.shape[0] != adj.shape[1]:
+        raise ValueError("adj must be a square adjacency matrix")
     best = int(np.argmax(q))
     N = adj.shape[0]
     source_mask = room_mask(N, source_room)

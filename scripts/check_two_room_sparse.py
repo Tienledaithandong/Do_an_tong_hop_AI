@@ -115,6 +115,8 @@ def main() -> None:
     clique_path = RESULTS / f"two_room_replicates{suffix}.csv"
 
     if args.refit:
+        if not sparse_path.is_file():
+            raise SystemExit(f"{sparse_path.name} not found; run without --refit first")
         sparse_df = pd.read_csv(sparse_path)
         if "hit50_raw" not in sparse_df or sparse_df["seed"].duplicated().any():
             raise SystemExit("Legacy sparse CSV has reused seeds or lacks raw crossings; rerun without --refit.")

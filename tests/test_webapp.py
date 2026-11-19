@@ -1,5 +1,6 @@
 import json
 import math
+import queue
 import threading
 import time
 import urllib.error
@@ -357,3 +358,28 @@ def test_ui_script_only_touches_handles_exposed_by_make_ui():
     used = set(re.findall(r"\bui\.([A-Za-z_]\w*)", script))
     missing = used - exposed - {"originalText"}
     assert not missing, f"app.js reads undefined UI handles: {sorted(missing)}"
+
+
+def test_job_admission_enforces_compute_budget():
+    with pytest.raises(webapp.ValidationError, match="ngân sách tính toán"):
+        webapp.submit({
+            "kind": "graph", "family": "ws", "param": 0.1,
+            "N": 800, "steps": 1000, "seeds": 200,
+        })
+    with pytest.raises(webapp.ValidationError, match="ngân sách tính toán"):
+        webapp.submit({
+            "kind": "compare", "N": 800, "steps": 1000, "seeds": 200,
+            "configs": [{"family": "ws", "param": 0.1}] * 2,
+        })
+
+
+def test_job_queue_is_bounded_and_full_queue_does_not_leak_history():
+    jobs = webapp.OrderedDict()
+    job_queue = queue.Queue(maxsize=webapp.MAX_QUEUED_JOBS)
+    for _ in range(webapp.MAX_QUEUED_JOBS):
+        job_queue.put_nowait(None)  # Simulate a saturated waiting queue.
+    job = webapp.Job(id="test-full", kind="graph", payload={})
+    with pytest.raises(webapp.ValidationError, match="Hàng đợi đang đầy"):
+        webapp._enqueue_job(job, jobs, job_queue)
+    assert not jobs
+    assert job_queue.maxsize == webapp.MAX_QUEUED_JOBS

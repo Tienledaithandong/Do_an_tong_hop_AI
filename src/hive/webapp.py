@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import io
+import ipaddress
 import json
 import math
 import os
@@ -64,6 +65,10 @@ REPORT_PDF = ROOT / "report" / "report.pdf"
 
 MAX_BODY = 1 << 20
 JOB_HISTORY = 24
+MAX_QUEUED_JOBS = 8
+# Approximate population-updates per accepted simulation; protects the single
+# worker from requests that would outlive the browser's polling deadline.
+MAX_JOB_WORK = 40_000_000
 
 FAMILIES: list[dict[str, Any]] = [
     {
@@ -195,6 +200,10 @@ STORED_RESULTS = (
 
 class ValidationError(ValueError):
     """Raised when a request payload is outside the supported range."""
+
+
+class QueueCapacityError(ValidationError):
+    """Raised when the bounded background queue cannot accept another job."""
 
 
 # ---------------------------------------------------------------------------
@@ -619,7 +628,7 @@ class Job:
 
 JOBS: "OrderedDict[str, Job]" = OrderedDict()
 JOBS_LOCK = threading.Lock()
-JOB_QUEUE: "queue.Queue[Job | None]" = queue.Queue()
+JOB_QUEUE: "queue.Queue[Job | None]" = queue.Queue(maxsize=MAX_QUEUED_JOBS)
 WORKER_LOCK = threading.Lock()
 WORKER: threading.Thread | None = None
 
@@ -925,6 +934,42 @@ def _run_tests(job: Job) -> tuple[dict[str, Any], dict[str, bytes]]:
     }, {}
 
 
+def _estimated_job_work(kind: str, common: dict[str, Any], config_count: int = 1) -> int:
+    """Approximate population-updates; intentionally conservative for admission."""
+    algorithms = 3 if kind == "reproduction" else 1
+    return int(common["N"] * common["steps"] * common["seeds"] * config_count * algorithms)
+
+
+def _enqueue_job(
+    job: Job,
+    jobs: "OrderedDict[str, Job]",
+    job_queue: "queue.Queue[Job | None]",
+) -> None:
+    """Atomically admit one job without allowing an unbounded backlog."""
+    with JOBS_LOCK:
+        try:
+            # Enqueue while holding the same lock used by the worker to publish
+            # status: the worker cannot expose a job before it is in ``jobs``.
+            job_queue.put_nowait(job)
+        except queue.Full as exc:
+            raise QueueCapacityError(
+                f"Hàng đợi đang đầy (tối đa {MAX_QUEUED_JOBS} việc đang chờ); thử lại sau"
+            ) from exc
+        jobs[job.id] = job
+        while len(jobs) > JOB_HISTORY:
+            removable = next(
+                (
+                    job_id
+                    for job_id, previous in jobs.items()
+                    if previous.status in {"done", "error"}
+                ),
+                None,
+            )
+            if removable is None:
+                break
+            jobs.pop(removable)
+
+
 def submit(payload: dict[str, Any]) -> Job:
     """Validate a request and queue it. Raises ``ValidationError`` on bad input."""
     if not isinstance(payload, dict):
@@ -935,6 +980,7 @@ def submit(payload: dict[str, Any]) -> Job:
 
     if kind in {"reproduction", "graph", "compare"}:
         common = _common(payload)
+        config_count = 1
         if kind == "graph":
             _family_param(
                 str(payload.get("family", "ws")),
@@ -947,6 +993,7 @@ def submit(payload: dict[str, Any]) -> Job:
                 raise ValidationError("configs phải là danh sách không rỗng")
             if len(configs) > 14:
                 raise ValidationError("tối đa 14 cấu hình mỗi lần so sánh")
+            config_count = len(configs)
             for item in configs:
                 if not isinstance(item, dict):
                     raise ValidationError("mỗi cấu hình phải là object {family, param}")
@@ -955,17 +1002,16 @@ def submit(payload: dict[str, Any]) -> Job:
                     item.get("param", 0),
                     common["N"],
                 )
+        work = _estimated_job_work(kind, common, config_count)
+        if work > MAX_JOB_WORK:
+            raise ValidationError(
+                f"Yêu cầu vượt ngân sách tính toán ({work:,} > {MAX_JOB_WORK:,} population-updates); "
+                "giảm N, steps, seeds hoặc số cấu hình"
+            )
 
     job = Job(id=uuid.uuid4().hex[:12], kind=kind, payload=payload)
-    with JOBS_LOCK:
-        JOBS[job.id] = job
-        while len(JOBS) > JOB_HISTORY:
-            oldest_id, oldest = next(iter(JOBS.items()))
-            if oldest.status in {"queued", "running"}:
-                break
-            JOBS.pop(oldest_id)
+    _enqueue_job(job, JOBS, JOB_QUEUE)
     _ensure_worker()
-    JOB_QUEUE.put(job)
     return job
 
 
@@ -1227,6 +1273,8 @@ class HiveHandler(BaseHTTPRequestHandler):
             return self.error_json(HTTPStatus.BAD_REQUEST, f"JSON không hợp lệ: {exc}")
         try:
             job = submit(payload)
+        except QueueCapacityError as exc:
+            return self.error_json(HTTPStatus.TOO_MANY_REQUESTS, str(exc))
         except ValidationError as exc:
             return self.error_json(HTTPStatus.BAD_REQUEST, str(exc))
         return self.send_json(HTTPStatus.ACCEPTED, job.public())
@@ -1247,7 +1295,24 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--host", default="127.0.0.1", help="địa chỉ bind (mặc định 127.0.0.1)")
     parser.add_argument("--port", type=int, default=8765, help="cổng (mặc định 8765)")
     parser.add_argument("--no-browser", action="store_true", help="không tự mở trình duyệt")
+    parser.add_argument(
+        "--allow-remote", action="store_true",
+        help="cho phép bind ngoài loopback (không có xác thực; chỉ dùng trong mạng tin cậy)",
+    )
     args = parser.parse_args(argv)
+    host_is_loopback = args.host.lower() == "localhost"
+    try:
+        host_is_loopback = host_is_loopback or ipaddress.ip_address(args.host).is_loopback
+    except ValueError:
+        pass
+    if not host_is_loopback and not args.allow_remote:
+        parser.error("--host ngoài loopback yêu cầu --allow-remote; server chưa có xác thực")
+    if not host_is_loopback:
+        print(
+            "CẢNH BÁO: server không có xác thực và có thể được truy cập bởi mọi máy "
+            "có kết nối tới địa chỉ này; chỉ tiếp tục trên mạng tin cậy.",
+            file=sys.stderr,
+        )
 
     # Windows consoles often default to cp1252, which cannot encode Vietnamese.
     for stream in (sys.stdout, sys.stderr):

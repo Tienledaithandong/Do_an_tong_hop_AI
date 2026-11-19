@@ -93,6 +93,42 @@ def test_source_room_experiment_reports_thresholds_and_hits():
     assert result["curves"].shape == (3, 201)
 
 
+@pytest.mark.parametrize("room", [2, -1, 5, True])
+def test_room_mask_rejects_invalid_room_index(room):
+    with pytest.raises(ValueError, match="room must be 0"):
+        room_mask(20, room)
+
+
+def test_room_mask_rejects_too_small_population():
+    with pytest.raises(ValueError, match="at least 2"):
+        room_mask(1, 0)
+
+
+@pytest.mark.parametrize(
+    "kwargs,match",
+    [
+        ({"source_room": 5}, "room must be 0"),
+        ({"n_types": 1}, "q"),
+        ({"seeds": 0}, "seeds must be a positive integer"),
+        ({"steps": -1}, "steps must be a non-negative integer"),
+    ],
+)
+def test_two_room_simulation_rejects_invalid_parameters(kwargs, match):
+    with pytest.raises(ValueError, match=match):
+        simulate_two_room_source(
+            two_room_graph(20, bridge=2, seed=0), make_q("middle", 5), **kwargs
+        )
+
+
+def test_source_initializer_rejects_empty_compartments_and_bad_options():
+    with pytest.raises(ValueError, match="at least 2"):
+        initial_types_source_room(np.random.default_rng(0), 1, 20, 0, room_mask(20))
+    with pytest.raises(ValueError, match="valid option"):
+        initial_types_source_room(np.random.default_rng(0), 5, 20, 5, room_mask(20))
+    with pytest.raises(ValueError, match="non-empty proper subset"):
+        initial_types_source_room(np.random.default_rng(0), 5, 20, 0, np.ones(20, dtype=bool))
+
+
 def test_source_room_seed_offset_selects_same_per_seed_stream():
     adj = two_room_graph(40, bridge=3, seed=0)
     q = make_q("middle", 5)

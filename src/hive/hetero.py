@@ -145,7 +145,14 @@ PREDICTORS = ["phi_deg_room", "inv_end_target", "inv_end_source", "tau"]
 
 
 def summarise_hetero(df: pd.DataFrame, n_boot: int = 800) -> pd.DataFrame:
-    """One row per ``(layout, bridge)`` with censored medians and graph-cluster CIs."""
+    """Summarize each cell with two cluster-bootstrap uncertainty estimates.
+
+    The primary ``*_lo``/``*_hi`` interval resamples graph clusters and then
+    trajectories within each sampled graph. ``*_graph_only_lo``/``*_hi`` are
+    the sensitivity interval that resamples graph clusters but retains all
+    trajectories within each selected graph. Reporting both separates graph
+    variability from within-graph Monte Carlo variability.
+    """
     out = []
     for (layout, bridge), g in df.groupby(CELL):
         row: dict[str, float | int | str] = {
@@ -170,15 +177,28 @@ def summarise_hetero(df: pd.DataFrame, n_boot: int = 800) -> pd.DataFrame:
             row[col] = float(g[col].mean())
         for key, hit in (("t_first", "hit_first"), ("t50", "hit50")):
             row[f"{key}_median"] = censored_median(g[key], g[hit])
+            values = g[key].to_numpy()
+            events = g[hit].to_numpy()
+            clusters = g["graph_seed"].to_numpy()
             lo, hi = bootstrap_ci(
-                g[key].to_numpy(),
-                g[hit].to_numpy(),
+                values,
+                events,
                 n_boot=n_boot,
-                cluster=g["graph_seed"].to_numpy(),
+                cluster=clusters,
+                resample_within_cluster=True,
+            )
+            graph_lo, graph_hi = bootstrap_ci(
+                values,
+                events,
+                n_boot=n_boot,
+                cluster=clusters,
+                resample_within_cluster=False,
             )
             row[f"{key}_lo"] = lo
             row[f"{key}_hi"] = hi
-            row[f"{key}_hit_rate"] = float(g[hit].mean())
+            row[f"{key}_graph_only_lo"] = graph_lo
+            row[f"{key}_graph_only_hi"] = graph_hi
+            row[f"{key}_hit_rate"] = float(events.mean())
         row["arrivals_mean"] = float(g["arrivals"].mean())
         row["extinctions_mean"] = float(g["extinctions"].mean())
         out.append(row)

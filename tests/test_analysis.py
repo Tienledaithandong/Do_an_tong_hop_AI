@@ -56,6 +56,8 @@ def test_diagnostics_report_uncertainty_and_influence():
     assert diag["influence"][0]["label"].startswith(("ws", "rgg", "complete"))
     assert isinstance(diag["warnings"], list)
     assert diag["correlations"]["path_length"]["n"] == 6
+    assert [row["min_hit_rate"] for row in diag["hit_rate_sensitivity"]] == [0.0, 0.25, 0.5, 0.75, 1.0]
+    assert diag["hit_rate_sensitivity"][2]["n_train"] == diag["n"]
 
 
 def _seeds_frame(noise: float = 0.0, seed: int = 0) -> pd.DataFrame:
