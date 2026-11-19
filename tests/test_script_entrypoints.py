@@ -34,6 +34,7 @@ def test_research_script_help_exposes_options(script, flag):
         cwd=ROOT,
         capture_output=True,
         text=True,
+        encoding="utf-8",
         timeout=30,
     )
     assert result.returncode == 0, result.stderr
