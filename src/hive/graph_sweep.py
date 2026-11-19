@@ -99,6 +99,22 @@ def reference_mrd(
     return curve
 
 
+def _cached_mrd(
+    cache: dict[tuple[int, ...], np.ndarray],
+    types: np.ndarray,
+    n: int,
+    q: np.ndarray,
+    steps: int,
+    delta: float,
+) -> np.ndarray:
+    """Reuse the deterministic reference when the initial counts are equal."""
+    counts = np.bincount(types, minlength=n)
+    key = tuple(counts.tolist())
+    if key not in cache:
+        cache[key] = reference_mrd(q, steps, pi0=counts / types.size, delta=delta)
+    return cache[key]
+
+
 def simulate_on_graph(
     adj: sparse.spmatrix,
     q: np.ndarray,
@@ -133,14 +149,15 @@ def simulate_on_graph(
     consensuses = np.zeros(seeds)
     l2s = np.zeros(seeds)
     tail = max(1, steps // 10)
+    mrd_cache: dict[tuple[int, ...], np.ndarray] = {}
+    # With nonnegative communication weights, global consensus is absorbing.
+    can_stop = mode == "well_mixed" or (sparse.issparse(adj) and np.all(adj.data >= 0))
 
     for seed in range(seeds):
         rng = np.random.default_rng(seed_offset + seed)
         bandit = Bandit(q, delta=delta, rng=rng)
         types = _initial_types(rng, n, N)
-        mrd_curves[seed] = reference_mrd(
-            q, steps, pi0=np.bincount(types, minlength=n) / N, delta=delta
-        )
+        mrd_curves[seed] = _cached_mrd(mrd_cache, types, n, q, steps, delta)
         curve = curves[seed]
         curve[0] = best_mass(types, best)
 
@@ -151,6 +168,9 @@ def simulate_on_graph(
             else:
                 types = graph_voter(types, rewards, adj, rng, n_types=n)
             curve[step + 1] = best_mass(types, best)
+            if can_stop and np.all(types == types[0]):
+                curve[step + 2 :] = curve[step + 1]
+                break
 
         t90s[seed], hits[seed] = t90(curve)
         finals[seed] = float(curve[-tail:].mean())
@@ -184,6 +204,7 @@ def simulate_two_room_source(
     source_room: int = 0,
     progress: Callable[[int, int], None] | None = None,
     return_state: bool = False,
+    seed_offset: int = 0,
 ) -> dict[str, np.ndarray]:
     """Two-room intervention with the optimal type seeded in one room only.
 
@@ -192,7 +213,8 @@ def simulate_two_room_source(
     is irrelevant. Here the target room starts with only non-optimal types;
     ``t50_target`` and ``t90_target`` therefore measure how long information
     needs to cross the bridge, which is the quantity the original experiment
-    claimed to isolate.
+    claimed to isolate. ``seed_offset`` shifts the per-seed RNG streams so
+    separate graph draws can use independent trajectories.
     """
     q = np.asarray(q, dtype=float)
     n = int(q.size) if n_types is None else n_types
@@ -221,14 +243,14 @@ def simulate_two_room_source(
         "hit": np.zeros(seeds, dtype=bool),
     }
     tail = max(1, steps // 10)
+    mrd_cache: dict[tuple[int, ...], np.ndarray] = {}
+    can_stop = sparse.issparse(adj) and np.all(adj.data >= 0)
 
     for seed in range(seeds):
-        rng = np.random.default_rng(seed)
+        rng = np.random.default_rng(seed_offset + seed)
         bandit = Bandit(q, delta=delta, rng=rng)
         types = initial_types_source_room(rng, n, N, best, source_mask)
-        mrd_curves[seed] = reference_mrd(
-            q, steps, pi0=np.bincount(types, minlength=n) / N, delta=delta
-        )
+        mrd_curves[seed] = _cached_mrd(mrd_cache, types, n, q, steps, delta)
         overall = curves["curves"][seed]
         source_curve = curves["source_curves"][seed]
         target_curve = curves["target_curves"][seed]
@@ -242,6 +264,11 @@ def simulate_two_room_source(
             overall[step + 1] = best_mass(types, best)
             source_curve[step + 1] = best_mass(types[source_mask], best)
             target_curve[step + 1] = best_mass(types[target_mask], best)
+            if can_stop and np.all(types == types[0]):
+                overall[step + 2 :] = overall[step + 1]
+                source_curve[step + 2 :] = source_curve[step + 1]
+                target_curve[step + 2 :] = target_curve[step + 1]
+                break
 
         for key, threshold, prefix in (
             ("t10_target", 0.10, "hit10_target"),

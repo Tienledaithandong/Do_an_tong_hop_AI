@@ -153,3 +153,84 @@ def test_missing_provenance_input_is_reported(artifacts):
 def test_full_package_requires_report_and_results(tmp_path):
     with pytest.raises(ValueError, match="report/report.pdf"):
         package.build_package(tmp_path, tmp_path / "out/missing.zip", "full")
+
+
+@pytest.fixture
+def complete_artifacts(artifacts):
+    """Small synthetic complete inventory; hashes and lineage are real."""
+    for name in package.required_files("full"):
+        path = artifacts / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if not path.exists():
+            path.write_bytes(name.encode())
+    provenance.write_metadata(
+        artifacts / "results", "full", {}, name="graph_sweep_metadata",
+        artifacts=[artifacts / name for name in package.required_files("full")
+                   if name.startswith(("results/", "figures/"))],
+    )
+    provenance.write_metadata(
+        artifacts / "report", "full", {}, name="report_metadata",
+        inputs=[artifacts / "report/report.md", artifacts / "figures/fig1_reproduction.png"],
+        artifacts=[artifacts / "report/report.pdf"],
+    )
+    # The fixture's extra figure is not part of the mandatory inventory but is
+    # included in the package and must also have provenance in strict mode.
+    provenance.write_metadata(
+        artifacts / "results", "full", {}, name="graph_seeds_metadata",
+        artifacts=[artifacts / "figures/fig1.png"],
+    )
+    return artifacts
+
+
+def test_report_pdf_is_in_coverage_and_without_metadata_is_unattributed(artifacts):
+    manifest = package.build_package(artifacts, artifacts / "out/snapshot.zip", "full")
+    assert "report/report.pdf" in manifest["provenance_coverage"]["unattributed_artifacts"]
+
+
+def test_strict_refuses_incomplete_before_creating_zip(artifacts):
+    output = artifacts / "out/incomplete.zip"
+    with pytest.raises(ValueError, match="missing required file: results/reproduction.npz"):
+        package.build_package(artifacts, output, "full", strict=True)
+    assert not output.exists()
+
+
+def test_complete_package_can_be_built_and_verified_strictly(complete_artifacts):
+    root = complete_artifacts
+    output = root / "out/complete.zip"
+    manifest = package.build_package(root, output, "full", strict=True)
+    assert "report/report.pdf" in manifest["provenance_coverage"]["attributed_artifacts"]
+    assert package.verify_package(output, strict=True) == manifest
+
+
+def test_strict_rejects_changed_report_input_even_if_pdf_hash_matches(complete_artifacts):
+    root = complete_artifacts
+    (root / "report/report.md").write_bytes(b"changed report")
+    output = root / "out/stale-report.zip"
+    manifest = package.build_package(root, output, "full")
+    assert "report/report.pdf" in manifest["provenance_coverage"]["attributed_artifacts"]
+    with pytest.raises(ValueError, match="missing or changed inputs/source for report/report.pdf"):
+        package.verify_package(output, strict=True)
+
+
+def test_strict_accepts_superseded_render_when_new_provenance_is_valid(complete_artifacts):
+    root = complete_artifacts
+    image = root / "figures/fig1_reproduction.png"
+    image.write_bytes(b"replotted image")
+    provenance.write_metadata(
+        root / "results", "full", {}, name="reproduction_render_metadata",
+        inputs=[root / "results/reproduction.npz"], artifacts=[image],
+    )
+    # Regenerate report after replotting, as its image input changed.
+    provenance.write_metadata(
+        root / "report", "full", {}, name="report_metadata",
+        inputs=[root / "report/report.md", image], artifacts=[root / "report/report.pdf"],
+    )
+    manifest = package.build_package(root, root / "out/replotted.zip", "full", strict=True)
+    assert "results/graph_sweep_metadata.json" in manifest["provenance_coverage"]["stale_metadata"]
+
+
+def test_strict_rejects_mismatched_source_when_no_current_lineage(complete_artifacts):
+    root = complete_artifacts
+    (root / "src/hive/model.py").write_bytes(b"changed code")
+    with pytest.raises(ValueError, match="missing or changed inputs/source"):
+        package.build_package(root, root / "out/drift.zip", "full", strict=True)

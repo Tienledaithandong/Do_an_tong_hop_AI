@@ -27,7 +27,7 @@ from hive.bandit import make_q
 from hive.config import TWO_ROOM_SOURCE
 from hive.graph_sweep import simulate_two_room_source
 from hive.graphs import average_path_length, degree_stats, relaxation_time, two_room_graph
-from hive.metrics import rmst
+from hive.metrics import kaplan_meier_median, rmst
 from hive.plots import plot_two_room_source
 from hive.provenance import write_metadata
 
@@ -127,7 +127,7 @@ def main() -> None:
                 "bridge": int(bridge),
                 "tau": group["tau"].iloc[0],
                 "path_length": group["path_length"].iloc[0],
-                "t10_median": float(group["t10_target"].median()),
+                "t10_median": kaplan_meier_median(group["t10_target"], group["hit10_target"]),
                 "t50_median": t50,
                 "t50_lo": t50_lo,
                 "t50_hi": t50_hi,
@@ -144,7 +144,7 @@ def main() -> None:
                 ),
                 "final_target_median": float(group["final_target"].median()),
                 "final_target95": float((group["final_target"] >= 0.95).mean()),
-                "t90_overall_median": float(group["t90"].median()),
+                "t90_overall_median": kaplan_meier_median(group["t90"], group["hit"]),
             }
         )
     summary = pd.DataFrame(summary_rows).sort_values("bridge")

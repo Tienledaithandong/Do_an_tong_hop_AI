@@ -3,6 +3,7 @@ import pandas as pd
 import pytest
 
 from hive.analysis import (
+    _collapse_graphs,
     hierarchical_bootstrap_law,
     law_diagnostics,
     law_frame,
@@ -105,7 +106,7 @@ def test_hierarchical_bootstrap_needs_at_least_three_configs():
 
 def test_hierarchical_bootstrap_ignores_censored_sentinels_inside_resamples():
     # Two hit seeds at the true value plus two censored sentinels per graph:
-    # a raw median would be dragged to (v+999)/2, the hit-only median stays v.
+    # a raw median would be dragged to (v+999)/2, the KM median stays v.
     rows = []
     for L in (1.0, 2.0, 3.0, 4.0):
         for graph in range(2):
@@ -124,8 +125,16 @@ def test_hierarchical_bootstrap_ignores_censored_sentinels_inside_resamples():
     assert law["slope"] == pytest.approx(5.0)
     assert law["intercept"] == pytest.approx(10.0)
     np.testing.assert_allclose(law["ci"]["slope"], [5.0, 5.0])
-    # Resamples that draw only censored seeds are skipped, not averaged in.
+    # Resamples with an unobserved config median are skipped.
     assert 0 < law["n_boot_used"] <= 100
+
+
+def test_graph_bootstrap_drops_length_and_time_together():
+    graphs = [
+        (1.0, np.array([10, 101, 101]), np.array([True, False, False])),
+        (9.0, np.array([30, 35, 101]), np.array([True, True, False])),
+    ]
+    assert _collapse_graphs(graphs) == (9.0, 35.0)
 
 
 def test_leave_one_family_out_refits_without_each_family():

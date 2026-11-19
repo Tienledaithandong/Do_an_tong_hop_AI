@@ -1,8 +1,6 @@
 """Shared experiment configuration.
 
-Single source of truth for the knobs used by ``scripts/run_all.py`` and
-``scripts/check_heavy_tail.py`` so the quick/full runs and the heavy-tail
-reference values cannot drift apart.
+Shared settings for the main sweep and supplementary experiments.
 """
 
 from __future__ import annotations
@@ -38,17 +36,13 @@ RUN_ALL: dict[str, dict[str, dict]] = {
     },
 }
 
-# Calibration line used by scripts/check_heavy_tail.py to judge the
-# t90 ~ L law on heavy-tailed networks. Fitted in the report on the 16
-# non-intervention configurations (see ``hive.plots.fit_law``).
+# Validation networks use the same settings as the full sweep.
 HEAVY_TAIL: dict = {
     "n": 500,
     "steps": 400,
     "seeds": 100,
     "n_types": 10,
     "scenario": "middle",
-    "intercept": 44.85,
-    "slope": 3.46,
 }
 
 # Multi-graph-seed calibration (scripts/check_graph_seeds.py). The headline

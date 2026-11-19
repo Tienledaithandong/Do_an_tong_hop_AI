@@ -381,7 +381,7 @@ function renderGraph(result, jobId, ui) {
   ui.metrics.innerHTML = [
     metric('τ (relaxation)', fmtTau(metrics.tau), connected ? 'thời gian trộn' : 'không liên thông', connected ? '' : 'warn'),
     metric('L (đường đi)', fmt(metrics.path_length, 2), 'khoảng cách trung bình'),
-    metric('t₉₀ trung vị (nhóm đạt)', summary.t90_median == null ? 'không xác định' : fmt(summary.t90_median, 1), summary.t90_median == null ? `không seed nào đạt trong ${params.steps} bước` : 'bước · có điều kiện', hitTone),
+    metric('t₉₀ trung vị Kaplan–Meier', summary.t90_median == null ? 'chưa quan sát được' : fmt(summary.t90_median, 1), summary.t90_median == null ? `dưới một nửa số seed đạt trong ${params.steps} bước` : 'bước', hitTone),
     metric('Seed đạt t₉₀', pct(summary.hit_rate), `${params.seeds} seed`, hitTone),
     metric('RMST₉₀', fmt(summary.t90_rmst, 1), `cửa sổ ${params.steps} bước`, hitTone),
     metric('Final (trung vị)', fmt(summary.final_median, 3), 'best mass'),
@@ -468,7 +468,7 @@ function renderCompare(result, jobId, ui) {
       ${slopeCi ? `<span>CI 95% độ dốc = <strong>${fmt(slopeCi[0], 2)} – ${fmt(slopeCi[1], 2)}</strong></span>` : ''}
     `;
   } else {
-    fitBox.innerHTML = '<span class="fit-title">Chưa đủ điểm để fit</span><span>Cần ít nhất 3 cấu hình không thuộc họ hai buồng.</span>';
+    fitBox.innerHTML = '<span class="fit-title">Chưa đủ điểm để fit</span><span>Cần ít nhất 3 cấu hình liên thông, có trung vị t₉₀ quan sát được và không thuộc họ hai buồng.</span>';
   }
 
   const warnings = fit.warnings || [];

@@ -1,6 +1,6 @@
 """Experiment A: reproduce the well-mixed learning curves of the paper.
 
-Three learners start from the same uniform policy and face the same bandit:
+Three learners start from the same empirical policy and face the same bandit:
 the weighted voter population, parallel Maynard-Cross Learning, and the
 Maynard-Smith replicator dynamics used as the analytical reference.
 """
@@ -52,8 +52,8 @@ def run_reproduction(
             types = np.concatenate([types, rng.integers(0, n, N - types.size)])
         rng.shuffle(types)
 
-        pi_pmcl = np.full(n, 1.0 / n)
         pi_mrd = np.bincount(types, minlength=n) / N
+        pi_pmcl = pi_mrd.copy()
         curves["well_mixed"][seed, 0] = best_mass(types, best)
         curves["pmcl"][seed, 0] = pi_pmcl[best]
         curves["mrd"][seed, 0] = pi_mrd[best]

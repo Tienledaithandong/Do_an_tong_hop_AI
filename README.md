@@ -54,9 +54,11 @@ không mô phỏng lại. Chẩn đoán quick dùng
 `python scripts/analyze_law.py --input results/quick/graph_sweep.csv`; JSON được
 ghi cạnh CSV đầu vào, không đè `results/law_diagnostics.json` đầy đủ.
 
-Kiểm tra bổ sung trên mạng đuôi nặng (Bảng 2 trong báo cáo):
+Kiểm tra bổ sung trên mạng đuôi nặng (Bảng 2 trong báo cáo): cần chạy sweep
+đồ thị đầy đủ trước để lấy đường hiệu chuẩn từ `results/graph_sweep.csv`.
 
 ```bash
+python scripts/run_all.py --only graph
 python scripts/check_heavy_tail.py
 ```
 
@@ -74,8 +76,10 @@ có ma trận kề khác nhau)
 (10 graph × 30 seed mỗi cấu hình; riêng complete và WS `p = 0` là topology tất
 định nên chạy 1 graph × 300 seed), tổng **4.800 lần chạy** với seed độc lập theo
 từng (cấu hình, graph). Bootstrap phân tầng resample graph trong cấu hình rồi
-cặp `(t90, hit)` trong mỗi graph — censoring được xử lý ngay trong từng resample —
-để CI phản ánh cả biến thiên giữa các graph. CI này **điều kiện hoá trên tập cấu
+cặp `(t90, hit)` trong mỗi graph — censoring được xử lý ngay trong từng resample.
+Mỗi điểm ghép `L` và trung vị Kaplan–Meier từ cùng những graph quan sát được
+trung vị, kể cả trong từng mẫu bootstrap. CI phản ánh cả biến thiên giữa các
+graph và **điều kiện hoá trên tập cấu
 hình cố định**; độ nhạy theo họ đồ thị xem `leave_one_family_out`:
 
 ```bash
@@ -83,8 +87,12 @@ python scripts/check_graph_seeds.py          # ~15–20 phút; Hình 8
 python scripts/check_graph_seeds.py --quick  # vài giây
 ```
 
-Bản nhân rộng của thí nghiệm này (nhiều đồ thị, nhiều `N`, tách thời gian
-chờ ở cầu khỏi thời gian lan trong buồng, hồi quy theo độ dẫn `φ`):
+Bản nhân rộng của thí nghiệm này khảo sát nhiều `N`, tách thời gian chờ ở cầu
+khỏi thời gian lan trong buồng và hồi quy theo độ dẫn `φ`. Với hai clique, mỗi
+ô cấu hình chỉ có một topology duy nhất: nhãn graph seed khác nhau không phải
+các topology độc lập. Khoảng tin cậy của ô này bootstrap theo quỹ đạo. Phân rã
+thời gian dùng `t50` thô trên cùng các quỹ đạo đã quan sát cả hai sự kiện, nên
+không mô tả phần thời gian chưa quan sát của các quỹ đạo bị censor:
 
 ```bash
 python scripts/check_two_room_replicates.py          # ~20 phút; Hình 5
@@ -94,7 +102,8 @@ python scripts/check_two_room_replicates.py --refit  # tính lại fit từ CSV 
 
 Tách `τ` khỏi độ dẫn của cầu bằng buồng thưa (đồ thị đều ngẫu nhiên bậc `d`
 thay cho clique; cần chạy `check_two_room_replicates.py` trước vì kết quả
-được gộp với lưới clique):
+được gộp với lưới clique). Với buồng thưa ngẫu nhiên, bootstrap lấy mẫu lại
+graph rồi lấy mẫu lại quỹ đạo trong từng graph:
 
 ```bash
 python scripts/check_two_room_sparse.py          # ~15 phút; Hình 6
@@ -124,7 +133,9 @@ python scripts/check_threshold_sensitivity.py --quick  # vài giây
 `check_two_room.py` chỉ gieo type tốt nhất vào một buồng, rồi đo thời gian
 lan sang buồng còn lại theo độ rộng cầu. Đây là thiết kế can thiệp thay cho
 cấu hình hai buồng cũ (cả hai buồng đều đã có type tốt, nên cầu không mang
-thông tin).
+thông tin). Trung vị và CI t₅₀/t₉₀ ở Hình 4 chỉ tính trên các lần đạt ngưỡng;
+hãy đọc cùng tỉ lệ đạt và RMST có xét censoring trong bảng kết quả, nhất là
+khi nhiều lần chạy chưa đạt ngưỡng.
 
 ## Giao diện mô phỏng
 
@@ -146,7 +157,9 @@ Mở `http://127.0.0.1:8765/`. Giao diện là một dashboard sáu tab:
 - **Đồ thị đơn** — chọn WS, RGG, hai buồng, BA hoặc ER; xem τ, L, đường học
   và cấu trúc đồ thị ở trạng thái cuối.
 - **So sánh** — chạy nhiều topology cùng lúc, tái hiện bảng và biểu đồ
-  t₉₀ theo τ và theo L; kết quả trả kèm CI và cảnh báo chẩn đoán.
+  t₉₀ theo τ và theo L; kết quả trả kèm CI và cảnh báo chẩn đoán. Trung vị
+  t₉₀ là trung vị Kaplan–Meier của toàn bộ quỹ đạo, có xét censoring; nếu không
+  quan sát được trung vị, không coi thời gian kết thúc mô phỏng là thời điểm đạt.
 - **Kết quả lưu** — đọc trực tiếp các CSV trong `results/` (kể cả
   `two_room_source*.csv`) và tải về.
 - **Kiểm thử** — chạy `pytest -q` ngay trên trình duyệt và xem output.
@@ -275,6 +288,31 @@ python scripts/package_artifacts.py --quick --output out/defense-quick.zip
 python scripts/package_artifacts.py --verify out/defense-quick.zip
 ```
 
+Để tạo **gói đầy đủ có kiểm tra provenance nghiêm ngặt**, hoàn tất chỉnh sửa
+source trước, chạy lại các thí nghiệm theo thứ tự phụ thuộc rồi dựng báo cáo:
+
+```bash
+python scripts/run_all.py
+python scripts/check_heavy_tail.py
+python scripts/check_two_room.py
+python scripts/check_two_room_replicates.py
+python scripts/check_two_room_sparse.py
+python scripts/check_two_room_hetero.py
+python scripts/check_graph_seeds.py
+python scripts/check_threshold_sensitivity.py
+python scripts/analyze_law.py
+python scripts/build_report.py
+python scripts/package_artifacts.py --strict --output out/defense-verified.zip
+python scripts/package_artifacts.py --strict --verify out/defense-verified.zip
+```
+
+Mỗi lệnh phải hoàn tất thành công trước khi chạy lệnh kế tiếp. `--strict` yêu
+cầu đủ dữ liệu và hình của bộ thí nghiệm đầy đủ, báo cáo PDF, và ít nhất một
+sidecar khớp cho từng artifact với hash source và đầu vào còn khớp. Nếu vẽ lại
+hình, sidecar render mới hợp lệ có thể thay cho hash hình cũ trong sidecar mô
+phỏng. Kiểm tra này không chứng minh những con số viết trong báo cáo khớp CSV;
+cần đối chiếu nội dung báo cáo với kết quả mới trước khi nộp.
+
 Bỏ `--output` để tên ZIP tự có timestamp; tên đã tồn tại sẽ bị từ chối thay vì
 bị ghi đè. ZIP gồm source/test, dependency, cấu hình CI, README, nguồn báo cáo,
 dữ liệu/hình theo chế độ; PDF báo cáo chỉ ở gói full. Không đóng gói `.env`,
@@ -334,11 +372,11 @@ Chưa thêm `LICENSE` địa phương vì chủ sở hữu chưa chọn phạm v
   giữa các graph và swarm seed trong tập cấu hình cố định. `analyze_law.py`
   resample các điểm cấu hình của mẫu một graph, nên đo một câu hỏi khác;
   không thể quy chênh lệch bề rộng hai CI hoàn toàn cho nhiễu vẽ graph.
-  Hai bản còn khác **estimand**: `config_summary`/`fit_law`/`analyze_law` lấy
-  trung vị `t90` trên toàn bộ seed (censor tính bằng chặn `steps+1`, kiểu
-  Kaplan–Meier), còn bootstrap phân tầng lấy trung vị chỉ trên nhóm seed đạt
-  ngưỡng trong mỗi graph; chênh lệch giữa hai đường hiệu chuẩn gồm cả khác
-  estimand chứ không chỉ nhiễu (xem §5.3 báo cáo).
+  Hình 2, Hình 8 và dashboard dùng trung vị Kaplan–Meier trên toàn bộ seed,
+  không dùng trung vị riêng nhóm đạt ngưỡng. Hình 8 lấy trung bình các trung vị
+  theo graph, còn Hình 2 dùng một graph cho mỗi cấu hình; cần phân biệt hai
+  cách tổng hợp khi so sánh đường khớp. `L` và trung vị trong Hình 8 được lấy
+  từ cùng tập graph có trung vị quan sát được trong từng mẫu bootstrap.
   Censoring được xử lý trong từng resample; seed độc lập theo (cấu hình, graph);
   topology tất định (complete, WS `p = 0`) tính là một graph. CI điều kiện hoá
   trên tập cấu hình cố định — độ nhạy theo họ xem `leave_one_family_out`.

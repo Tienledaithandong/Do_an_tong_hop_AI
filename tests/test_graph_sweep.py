@@ -77,9 +77,8 @@ def test_seed_offset_shifts_the_rng_without_changing_determinism():
 
 
 def test_two_room_source_mrd_is_the_mean_over_seeds(monkeypatch):
-    # The source-room init is deterministic across seeds, so the real MRD
-    # reference is identical per seed and cannot distinguish mean from last.
-    # Patch reference_mrd to return a distinct curve per call to pin the mean.
+    # The initial counts are identical across seeds. The reference is a pure
+    # function of those counts and is computed only once per simulation call.
     from hive import graph_sweep
 
     steps, seeds = 5, 3
@@ -94,9 +93,5 @@ def test_two_room_source_mrd_is_the_mean_over_seeds(monkeypatch):
     res = graph_sweep.simulate_two_room_source(
         adj, make_q("middle"), steps=steps, seeds=seeds, n_types=10
     )
-    expected = np.mean(
-        [np.full(steps + 1, float(k)) for k in range(1, seeds + 1)], axis=0
-    )
-    assert calls["n"] == seeds
-    np.testing.assert_allclose(res["mrd"], expected)
-    assert not np.allclose(res["mrd"], np.full(steps + 1, float(seeds)))
+    assert calls["n"] == 1
+    np.testing.assert_array_equal(res["mrd"], np.ones(steps + 1))

@@ -8,8 +8,8 @@ Experiment B (scenario middle, n = 10 types):
 - Erdos-Renyi, mean degree ~ 6 (Poisson tail, sanity anchor), conditioned on
   connectivity so that tau and L mean the same thing as in the main sweep
 
-Writes results/heavy_tail.csv. The calibration line from the main sweep is
-t90 = 44.85 + 3.46 * L, fitted on the 16 non-intervention configurations.
+Reads the calibration data in results/graph_sweep.csv from the full sweep
+and writes results/heavy_tail.csv.
 """
 
 from __future__ import annotations
@@ -29,6 +29,8 @@ from hive.bandit import make_q
 from hive.config import HEAVY_TAIL
 from hive.graphs import average_path_length, degree_stats, relaxation_time
 from hive.graph_sweep import simulate_on_graph
+from hive.metrics import kaplan_meier_median, rmst
+from hive.plots import config_summary, fit_law
 from hive.provenance import write_metadata
 
 N = HEAVY_TAIL["n"]
@@ -36,8 +38,6 @@ STEPS = HEAVY_TAIL["steps"]
 SEEDS = HEAVY_TAIL["seeds"]
 N_TYPES = HEAVY_TAIL["n_types"]
 SCENARIO = HEAVY_TAIL["scenario"]
-INTERCEPT = HEAVY_TAIL["intercept"]
-SLOPE = HEAVY_TAIL["slope"]
 
 
 def to_csr(graph: nx.Graph) -> sparse.csr_matrix:
@@ -64,6 +64,12 @@ def connected_er(n: int, m: int, seed: int = 0) -> nx.Graph:
 
 
 def main() -> int:
+    calibration = ROOT / "results" / "graph_sweep.csv"
+    if not calibration.is_file():
+        raise SystemExit("Chạy scripts/run_all.py --only graph để tạo dữ liệu hiệu chuẩn đầy đủ.")
+    intercept, slope, _, _ = fit_law(config_summary(pd.read_csv(calibration)))
+    if not np.isfinite(slope):
+        raise SystemExit("Dữ liệu graph_sweep.csv không đủ để hiệu chuẩn t90.")
     q = make_q(SCENARIO, N_TYPES)
     builders = [
         ("ba_m2", lambda: nx.barabasi_albert_graph(N, 2, seed=0)),
@@ -80,8 +86,8 @@ def main() -> int:
         result = simulate_on_graph(
             adj, q, steps=STEPS, seeds=SEEDS, n_types=N_TYPES
         )
-        median_t90 = float(np.median(result["t90"]))
-        prediction = HEAVY_TAIL["intercept"] + HEAVY_TAIL["slope"] * path_length
+        median_t90 = kaplan_meier_median(result["t90"], result["hit"])
+        prediction = intercept + slope * path_length
         rows.append(
             {
                 "family": name,
@@ -90,7 +96,7 @@ def main() -> int:
                 "path_length": path_length,
                 "degree_cv": stats["cv"],
                 "t90": median_t90,
-                "t90_mean": float(np.mean(result["t90"])),
+                "t90_rmst": rmst(result["t90"], result["hit"], STEPS),
                 "hit_rate": float(np.mean(result["hit"])),
                 "final": float(np.median(result["final"])),
                 "final95": float(np.mean(result["final"] >= 0.95)),
@@ -118,10 +124,10 @@ def main() -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(rows).to_csv(out, index=False)
     write_metadata(
-        out.parent, "full", {"delta": 0.1, "networks": ["ba_m2", "ba_m5", "er_k6"], **HEAVY_TAIL},
+        out.parent, "full", {"delta": 0.1, "networks": ["ba_m2", "ba_m5", "er_k6"], "intercept": intercept, "slope": slope, **HEAVY_TAIL},
         name="heavy_tail_metadata",
         extra={"graph_seed": 0, "er_draws": "first connected G(n,m) among seeds 0..999", "swarm_rng": "default_rng(seed), seed=0..seeds-1; reused across networks"},
-        artifacts=[out],
+        inputs=[calibration], artifacts=[out],
     )
     print("wrote", out)
     return 0

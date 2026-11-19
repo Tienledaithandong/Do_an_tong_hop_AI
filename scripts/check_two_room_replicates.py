@@ -1,8 +1,8 @@
-"""Replicated source-room experiment: several graphs, several room sizes.
+"""Replicated source-room experiment: clique rooms at several sizes.
 
-Splits the delay of the best type into the wait at the bridge (``t_first``)
-and the spread inside the target room, and tests whether the wait scales with
-the bridge conductance ``phi = bridge / (N / 2)``.
+The clique topology is deterministic up to relabeling. Trajectories use
+independent seeds. The paired split uses the physical first arrival and raw
+first crossing of 50%, conditional on both being observed.
 
 Usage:
     python scripts/check_two_room_replicates.py            # ~20 min
@@ -54,11 +54,15 @@ def compute_fits(summary: pd.DataFrame, df: pd.DataFrame | None = None) -> dict[
     if len(ok50) >= 3:
         fits["t50_vs_phi"] = fit_loglog(ok50["phi"], ok50["t50_median"])
         fits["t50_bridge_and_N"] = fit_loglog2(ok50["bridge"], ok50["N"], ok50["t50_median"])
-        post = ok50["t50_median"] - ok["t_first_median"].reindex(ok50.index)
-        fits["share_of_t50_after_first_arrival"] = {
-            "min": float((post / ok50["t50_median"]).min()),
-            "max": float((post / ok50["t50_median"]).max()),
-        }
+    if "paired50_first_fraction_median" in summary:
+        fractions = summary["paired50_first_fraction_median"].dropna()
+        if not fractions.empty:
+            fits["paired_raw50_first_fraction_median_range"] = {
+                "min": float(fractions.min()),
+                "max": float(fractions.max()),
+                "cells": int(len(fractions)),
+                "definition": "per-trajectory t_first / raw_t50, conditional on both observed",
+            }
     if df is not None:
         for name, key, hit in (
             ("t_first_vs_phi", "t_first", "hit_first"),
@@ -88,7 +92,10 @@ def main() -> None:
 
     if args.refit:
         df = pd.read_csv(RESULTS / f"two_room_replicates{suffix}.csv")
-        summary = pd.read_csv(RESULTS / f"two_room_replicates_summary{suffix}.csv")
+        if "hit50_raw" not in df or df["seed"].duplicated().any() or (df.groupby(["N", "bridge"])["graph_seed"].nunique() > 1).any():
+            raise SystemExit("Legacy clique CSV has reused seeds or lacks raw crossings; rerun without --refit.")
+        summary = summarise(df)
+        summary.to_csv(RESULTS / f"two_room_replicates_summary{suffix}.csv", index=False)
     else:
         cfg = TWO_ROOM_REPLICATES["quick" if args.quick else "full"]
         sizes = {int(k): int(v) for k, v in cfg["sizes"].items()}
@@ -106,7 +113,7 @@ def main() -> None:
             RESULTS, "quick" if args.quick else "full",
             {**cfg, "graph_seeds": args.graph_seeds or cfg["graph_seeds"], "seeds": args.seeds or cfg["seeds"], "n_types": 10, "scenario": "middle", "delta": 0.1, "source_room": 0},
             suffix=suffix, name="two_room_replicates_metadata",
-            extra={"graph_rng": "graph_seed=0..graph_seeds-1 per cell", "swarm_rng": "default_rng(seed), seed=0..seeds-1; reused across cells and graphs", "summary_n_boot": 1000, "bootstrap_seed": 0},
+            extra={"graph_rng": "one clique topology per N and bridge; other endpoint labels are isomorphic", "swarm_rng": "default_rng(seed); disjoint consecutive seeds across cells", "bootstrap": "trajectory resampling within each deterministic clique", "paired_split": "physical first arrival and raw 50% first crossing, conditional on both events", "summary_n_boot": 1000, "bootstrap_seed": 0},
             artifacts=[RESULTS / f"two_room_replicates{suffix}.csv", RESULTS / f"two_room_replicates_summary{suffix}.csv"],
         )
 
@@ -137,6 +144,8 @@ def main() -> None:
         "t50_hit_rate",
         "t90_median",
         "t90_hit_rate",
+        "paired50_rate",
+        "paired50_first_fraction_median",
         "arrivals_mean",
         "extinctions_mean",
     ]

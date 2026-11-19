@@ -7,6 +7,7 @@ from hive.metrics import (
     best_mass,
     consensus,
     kaplan_meier,
+    kaplan_meier_median,
     l2_to_reference,
     rmst,
     t90,
@@ -76,6 +77,16 @@ def test_kaplan_meier_all_censored_stays_at_one():
 def test_kaplan_meier_rejects_mismatched_shapes():
     with pytest.raises(ValueError):
         kaplan_meier(np.array([1.0, 2.0]), np.ones(3, dtype=bool))
+
+
+def test_kaplan_meier_median_uses_first_crossing_even_at_exactly_half():
+    assert kaplan_meier_median([2, 4, 11, 11], [True, True, False, False]) == 4
+    assert np.isnan(kaplan_meier_median([2, 11, 11], [True, False, False]))
+
+
+def test_kaplan_meier_median_accounts_for_early_censoring():
+    # Censor the first two of four runs. The next event reduces survival to 0.5.
+    assert kaplan_meier_median([1, 2, 3, 4], [False, False, True, True]) == 3
 
 
 def test_rmst_without_censoring_is_the_truncated_mean():

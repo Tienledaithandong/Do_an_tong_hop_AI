@@ -104,7 +104,7 @@ def test_report_code_spans_have_glyphs(text, font):
     assert f'name="{font or module.FAMILY}"' in module.inline(f"`{text}`")
 
 
-def test_replicate_refit_hashes_both_saved_inputs_without_relabeling_summary(tmp_path, monkeypatch):
+def test_replicate_refit_hashes_raw_and_recomputed_summary(tmp_path, monkeypatch):
     import pandas as pd
 
     spec = importlib.util.spec_from_file_location("check_two_room_replicates", ROOT / "scripts" / "check_two_room_replicates.py")
@@ -116,13 +116,19 @@ def test_replicate_refit_hashes_both_saved_inputs_without_relabeling_summary(tmp
     raw = tmp_path / "two_room_replicates_quick.csv"
     summary = tmp_path / "two_room_replicates_summary_quick.csv"
     original = tmp_path / "two_room_replicates_metadata_quick.json"
-    pd.DataFrame({"seed": [0]}).to_csv(raw, index=False)
-    pd.DataFrame(columns=["N", "bridge", "phi", "t_first_median", "t_first_hit_rate", "t50_median", "t50_hit_rate", "t90_median", "t90_hit_rate", "arrivals_mean", "extinctions_mean"]).to_csv(summary, index=False)
+    pd.DataFrame([{
+        "N": 60, "bridge": 1, "graph_seed": 0, "seed": 0, "tau": 480, "path_length": 2,
+        "t_first": 10, "hit_first": True, "t50": 30, "hit50": True,
+        "t90": 40, "hit90": True, "t50_raw": 40, "hit50_raw": True,
+        "final_target": 1, "arrivals": 2, "extinctions": 1,
+    }]).to_csv(raw, index=False)
+    summary.write_text("old summary", encoding="utf-8")
     original.write_bytes(b"historical simulation metadata")
-    before = {path: path.read_bytes() for path in (raw, summary, original)}
+    before = {path: path.read_bytes() for path in (raw, original)}
     monkeypatch.setattr(sys, "argv", ["check_two_room_replicates.py", "--quick", "--refit"])
     module.main()
     assert all(path.read_bytes() == data for path, data in before.items())
+    assert pd.read_csv(summary).loc[0, "paired50_first_fraction_median"] == pytest.approx(0.25)
     meta = json.loads((tmp_path / "two_room_replicates_fits_metadata_quick.json").read_text(encoding="utf-8"))
     assert set(meta["inputs"]) == {raw.name, summary.name}
     assert meta["config"]["operation"] == "refit"

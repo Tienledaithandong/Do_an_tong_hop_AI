@@ -116,28 +116,32 @@ def main() -> None:
 
     if args.refit:
         sparse_df = pd.read_csv(sparse_path)
+        if "hit50_raw" not in sparse_df or sparse_df["seed"].duplicated().any():
+            raise SystemExit("Legacy sparse CSV has reused seeds or lacks raw crossings; rerun without --refit.")
     else:
         cfg = TWO_ROOM_SPARSE["quick" if args.quick else "full"]
         sizes = {int(k): int(v) for k, v in cfg["sizes"].items()}
         frames = []
+        next_seed = 1_000_000  # disjoint from the companion clique sweep
         for degree in cfg["room_degrees"]:
-            frames.append(
-                run_replicates(
+            frame = run_replicates(
                     sizes,
                     list(cfg["bridges"]),
                     graph_seeds=args.graph_seeds or cfg["graph_seeds"],
                     seeds=args.seeds or cfg["seeds"],
                     room_degree=int(degree),
+                    seed_offset=next_seed,
                     progress=lambda msg: print(f"  [{time.time() - started:6.0f}s] {msg}", flush=True),
-                )
             )
+            frames.append(frame)
+            next_seed += len(frame)
         sparse_df = pd.concat(frames, ignore_index=True)
         sparse_df.to_csv(sparse_path, index=False)
         write_metadata(
             RESULTS, "quick" if args.quick else "full",
             {**cfg, "graph_seeds": args.graph_seeds or cfg["graph_seeds"], "seeds": args.seeds or cfg["seeds"], "n_types": 10, "scenario": "middle", "delta": 0.1, "source_room": 0},
             suffix=suffix, name="two_room_sparse_metadata",
-            extra={"graph_rng": "graph_seed=0..graph_seeds-1 per cell", "swarm_rng": "default_rng(seed), seed=0..seeds-1; reused across cells and graphs"},
+            extra={"graph_rng": "graph_seed=0..graph_seeds-1 per sparse cell", "swarm_rng": "default_rng(seed); disjoint consecutive blocks per graph/cell/degree starting at 1000000", "bootstrap": "resample sparse graphs then trajectories within graph; resample trajectories within deterministic clique"},
             artifacts=[sparse_path],
         )
 
@@ -145,8 +149,13 @@ def main() -> None:
         raise SystemExit(
             f"{clique_path.name} not found; run scripts/check_two_room_replicates.py first"
         )
+    clique_df = pd.read_csv(clique_path)
+    if "hit50_raw" not in clique_df or clique_df["seed"].duplicated().any() or (clique_df.groupby(["N", "bridge"])["graph_seed"].nunique() > 1).any():
+        raise SystemExit("Legacy clique CSV has reused seeds or lacks raw crossings; rerun check_two_room_replicates.py first.")
+    if set(clique_df["seed"]).intersection(sparse_df["seed"]):
+        raise SystemExit("Clique and sparse CSVs reuse trajectory seeds; rerun with disjoint seed blocks.")
     pooled = pd.concat(
-        [with_room_columns(pd.read_csv(clique_path)), with_room_columns(sparse_df)],
+        [with_room_columns(clique_df), with_room_columns(sparse_df)],
         ignore_index=True,
     )
     summary = summarise(pooled)

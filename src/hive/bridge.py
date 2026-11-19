@@ -7,8 +7,9 @@ several graphs and room sizes, and splits the delay into two measurable parts:
 
 * ``t_first``  - first step at which the target room holds any copy of the
   best type (the wait *at the bridge*);
-* ``spread50`` / ``spread90`` - time from first arrival to 50% / 90% of the
-  target room (the spread *inside* the room).
+* paired post-arrival time: time from first arrival to 50% of the target room,
+  calculated on trajectories that reach both events. It may include extinction
+  and later re-entry, not just spread inside the room.
 
 It also computes the bridge conductance ``phi = bridge / (N / 2)`` so that
 candidate predictors can be compared on the same data.
@@ -24,6 +25,7 @@ import pandas as pd
 from .bandit import make_q
 from .graph_sweep import simulate_two_room_source
 from .graphs import average_path_length, relaxation_time, two_room_graph
+from .metrics import kaplan_meier_median, threshold_time
 
 
 def first_arrival(target_curves: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -86,37 +88,45 @@ def run_replicates(
     delta: float = 0.1,
     progress: Callable[[str], None] | None = None,
     room_degree: int | None = None,
+    seed_offset: int = 0,
 ) -> pd.DataFrame:
     """Run the source-room experiment on a grid; return one row per simulation seed.
 
     ``sizes`` maps the population size ``N`` to the number of steps to simulate.
-    Each ``(N, bridge, graph_seed)`` uses its own random graph, so variation
-    across graph seeds is part of the reported uncertainty. ``room_degree``
-    replaces the clique rooms by random regular graphs of that degree.
+    Clique graphs with fixed size and bridge count are isomorphic: generate one
+    graph and spend the same total budget (``graph_seeds * seeds``) on distinct
+    trajectories. For sparse rooms draw ``graph_seeds`` random regular graphs
+    with ``seeds`` independent trajectories each. ``seed_offset`` starts the
+    disjoint blocks of trajectory RNG seeds, including across separate calls.
     """
     q = make_q(scenario, n_types)
     rows: list[dict[str, float | int | bool]] = []
     for N, steps in sizes.items():
         for bridge in bridges:
-            for graph_seed in range(graph_seeds):
+            clique = room_degree is None or room_degree >= min(N // 2, N - N // 2) - 1
+            n_graphs = 1 if clique else graph_seeds
+            n_runs = graph_seeds * seeds if clique else seeds
+            for graph_seed in range(n_graphs):
                 adj = two_room_graph(
                     N, bridge=int(bridge), seed=graph_seed, room_degree=room_degree
                 )
                 _, tau = relaxation_time(adj)
                 path_length = average_path_length(adj)
                 res = simulate_two_room_source(
-                    adj, q, steps=steps, seeds=seeds, delta=delta, n_types=n_types
+                    adj, q, steps=steps, seeds=n_runs, delta=delta, n_types=n_types,
+                    seed_offset=seed_offset,
                 )
                 t_first, hit_first = first_arrival(res["target_curves"])
                 arrivals, extinctions = arrival_events(res["target_curves"])
-                for seed in range(seeds):
+                raw50 = [threshold_time(c, 0.5, method="raw") for c in res["target_curves"]]
+                for seed in range(n_runs):
                     rows.append(
                         {
                             "N": N,
                             "steps": steps,
                             "bridge": int(bridge),
                             "graph_seed": graph_seed,
-                            "seed": seed,
+                            "seed": seed_offset + seed,
                             "tau": tau,
                             "path_length": path_length,
                             "room_degree": int(room_degree or 0),
@@ -124,6 +134,8 @@ def run_replicates(
                             "hit_first": bool(hit_first[seed]),
                             "t50": res["t50_target"][seed],
                             "hit50": bool(res["hit50_target"][seed]),
+                            "t50_raw": raw50[seed][0],
+                            "hit50_raw": raw50[seed][1],
                             "t90": res["t90_target"][seed],
                             "hit90": bool(res["hit90_target"][seed]),
                             "final_target": res["final_target"][seed],
@@ -131,6 +143,7 @@ def run_replicates(
                             "extinctions": int(extinctions[seed]),
                         }
                     )
+                seed_offset += n_runs
                 if progress is not None:
                     progress(
                         f"N={N} d={room_degree or 'clique'} bridge={bridge} graph_seed={graph_seed}"
@@ -139,13 +152,9 @@ def run_replicates(
 
 
 def censored_median(values: np.ndarray, hit: np.ndarray) -> float:
-    """Median over *all* seeds with unreached seeds treated as ``+inf``.
-
-    The result is ``inf`` when fewer than half of the seeds reached the
-    threshold, which is the honest answer: the median is then not observed.
-    """
-    values = np.where(np.asarray(hit, dtype=bool), np.asarray(values, dtype=float), np.inf)
-    return float(np.median(values))
+    """Kaplan–Meier median, with an unobserved median returned as ``inf``."""
+    median = kaplan_meier_median(np.asarray(values, dtype=float), np.asarray(hit, dtype=bool))
+    return float(median) if np.isfinite(median) else float("inf")
 
 
 def bootstrap_ci(
@@ -154,11 +163,15 @@ def bootstrap_ci(
     n_boot: int = 1000,
     seed: int = 0,
     cluster: np.ndarray | None = None,
+    resample_within_cluster: bool = False,
 ) -> tuple[float, float]:
     """95% bootstrap CI for the censored median.
 
-    With ``cluster`` (e.g. the graph seed) whole clusters are resampled, so the
-    interval reflects graph-to-graph variation rather than only seed noise.
+    With ``cluster`` graph clusters are resampled. If
+    ``resample_within_cluster`` is true, trajectories are also resampled within
+    each drawn graph. A single deterministic graph then uses trajectory
+    bootstrap only. The default preserves graph-only resampling for callers
+    that require it.
     """
     values = np.asarray(values, dtype=float)
     hit = np.asarray(hit, dtype=bool)
@@ -171,11 +184,15 @@ def bootstrap_ci(
         idx_rows = []
         for _ in range(n_boot):
             picked = rng.integers(0, len(groups), size=len(groups))
-            idx_rows.append(np.concatenate([groups[g] for g in picked]))
+            idx_rows.append(np.concatenate([
+                rng.choice(groups[g], size=len(groups[g]), replace=True)
+                if resample_within_cluster else groups[g]
+                for g in picked
+            ]))
         idx = np.stack(idx_rows)
     meds = np.array(
         [
-            np.median(np.where(hit[i], values[i], np.inf))
+            censored_median(values[i], hit[i])
             for i in idx
         ]
     )
@@ -186,7 +203,13 @@ def bootstrap_ci(
 
 
 def summarise(df: pd.DataFrame, n_boot: int = 1000) -> pd.DataFrame:
-    """One row per ``(N, bridge)`` with censored medians and graph-cluster CIs."""
+    """Summarize each cell with graph-then-trajectory bootstrap CIs.
+
+    Paired timing statistics condition on reaching both events; the mean first
+    arrival and mean subsequent time add to the paired mean total, while the
+    median fraction is computed per trajectory. No result describes censored
+    trajectories' unobserved later paths.
+    """
     out = []
     df = with_room_columns(df)
     for (N, room_degree, bridge), g in df.groupby(["N", "room_degree", "bridge"]):
@@ -206,11 +229,35 @@ def summarise(df: pd.DataFrame, n_boot: int = 1000) -> pd.DataFrame:
         for key, hit in (("t_first", "hit_first"), ("t50", "hit50"), ("t90", "hit90")):
             row[f"{key}_median"] = censored_median(g[key], g[hit])
             lo, hi = bootstrap_ci(
-                g[key].to_numpy(), g[hit].to_numpy(), n_boot=n_boot, cluster=g["graph_seed"].to_numpy()
+                g[key].to_numpy(), g[hit].to_numpy(), n_boot=n_boot,
+                cluster=g["graph_seed"].to_numpy(), resample_within_cluster=True,
             )
             row[f"{key}_lo"] = lo
             row[f"{key}_hi"] = hi
             row[f"{key}_hit_rate"] = float(g[hit].mean())
+        # Older CSV files did not save raw crossings; never infer these from
+        # the centered crossing because that would change the estimand.
+        has_raw = {"hit50_raw", "t50_raw"}.issubset(g.columns) and g["hit50_raw"].notna().all()
+        paired = (
+            g[g["hit_first"].astype(bool) & g["hit50_raw"].astype(bool)]
+            if has_raw else g.iloc[0:0]
+        )
+        row["paired50_count"] = int(len(paired)) if has_raw else float("nan")
+        row["paired50_rate"] = float(len(paired) / len(g)) if has_raw else float("nan")
+        if len(paired):
+            first = paired["t_first"].to_numpy(float)
+            total = paired["t50_raw"].to_numpy(float)
+            row["paired50_first_mean"] = float(first.mean())
+            row["paired50_after_mean"] = float((total - first).mean())
+            row["paired50_total_mean"] = float(total.mean())
+            positive = total > 0
+            row["paired50_first_fraction_median"] = (
+                float(np.median(first[positive] / total[positive]))
+                if np.any(positive) else float("nan")
+            )
+        else:
+            for col in ("first_mean", "after_mean", "total_mean", "first_fraction_median"):
+                row[f"paired50_{col}"] = float("nan")
         row["final_target95"] = float((g["final_target"] >= 0.95).mean())
         row["arrivals_mean"] = float(g["arrivals"].mean())
         row["extinctions_mean"] = float(g["extinctions"].mean())
@@ -220,6 +267,17 @@ def summarise(df: pd.DataFrame, n_boot: int = 1000) -> pd.DataFrame:
         .sort_values(["N", "room_degree", "bridge"])
         .reset_index(drop=True)
     )
+
+
+def _resample_graph_trajectories(
+    by_graph: list[pd.DataFrame], rng: np.random.Generator
+) -> pd.DataFrame:
+    """Resample graphs and, separately for each selected graph, trajectories."""
+    picked = rng.integers(0, len(by_graph), size=len(by_graph))
+    return pd.concat([
+        by_graph[i].iloc[rng.integers(0, len(by_graph[i]), size=len(by_graph[i]))]
+        for i in picked
+    ])
 
 
 def bootstrap_exponent(
@@ -232,7 +290,7 @@ def bootstrap_exponent(
 ) -> tuple[float, float]:
     """95% CI for the log-log slope of ``key`` against ``predictor``.
 
-    Resamples graph seeds with replacement inside every ``(N, room_degree,
+    Resamples graphs and then trajectories within every ``(N, room_degree,
     bridge)`` cell, recomputes the censored medians and refits. Cells whose
     median is not observed (``inf``) are dropped from that replicate.
     ``predictor`` must be constant within a cell (``phi``, ``phi_deg``;
@@ -248,8 +306,7 @@ def bootstrap_exponent(
     for _ in range(n_boot):
         xs, ys = [], []
         for phi, by_graph in cells:
-            picked = rng.integers(0, len(by_graph), size=len(by_graph))
-            part = pd.concat([by_graph[i] for i in picked])
+            part = _resample_graph_trajectories(by_graph, rng)
             med = censored_median(part[key], part[hit])
             if np.isfinite(med):
                 xs.append(phi)
@@ -338,7 +395,7 @@ def bootstrap_multi(
 ) -> dict[str, tuple[float, float]]:
     """95% CIs for the exponents of ``log key = a + sum_k b_k log predictor_k``.
 
-    Whole graphs are resampled inside every ``(N, room_degree, bridge)`` cell.
+    Graphs and then their trajectories are resampled inside each cell.
     Predictors are recomputed as the mean over the resampled graphs, so graph
     to graph variation of ``tau`` and ``path_length`` is carried through.
     """
@@ -352,8 +409,7 @@ def bootstrap_multi(
         xs: dict[str, list[float]] = {p: [] for p in predictors}
         ys: list[float] = []
         for by_graph in cells:
-            picked = rng.integers(0, len(by_graph), size=len(by_graph))
-            part = pd.concat([by_graph[i] for i in picked])
+            part = _resample_graph_trajectories(by_graph, rng)
             med = censored_median(part[key], part[hit])
             if np.isfinite(med):
                 ys.append(med)

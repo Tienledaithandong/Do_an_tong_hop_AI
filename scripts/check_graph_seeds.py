@@ -3,7 +3,7 @@
 The headline diagnostics resample configuration points from one graph each.
 This sweep instead resamples graphs and trajectories within a fixed config set:
 it answers a different uncertainty question. RGG draws are conditioned on
-connectivity; the per-graph statistic is a hit-only median.
+connectivity; the per-graph statistic is a Kaplan–Meier median.
 
 Swarm seeds are offset per (config, graph) so every trajectory is independent
 (review #4). Deterministic topologies (complete, WS p=0) are run as a single
@@ -43,7 +43,7 @@ from hive.graphs import (
     rgg_graph,
     ws_graph,
 )
-from hive.metrics import rmst
+from hive.metrics import kaplan_meier_median, rmst
 from hive.plots import plot_graph_seeds
 from hive.provenance import write_metadata
 
@@ -120,7 +120,6 @@ def main() -> None:
             hits = res["hit"]
             t90_bank[f"{config}:{graph_seed}"] = t90s
             hit_rate = float(hits.mean())
-            reached = t90s[hits]
             graph_rows.append(
                 {
                     "config": config,
@@ -136,7 +135,7 @@ def main() -> None:
                     "lambda2": lambda2,
                     "degree_mean": stats["mean"],
                     "degree_cv": stats["cv"],
-                    "t90_median": float(np.median(reached)) if reached.size else float("nan"),
+                    "t90_median": kaplan_meier_median(t90s, hits),
                     "hit_rate": hit_rate,
                     "rmst": rmst(t90s, hits, steps),
                 }

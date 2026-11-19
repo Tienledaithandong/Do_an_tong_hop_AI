@@ -8,9 +8,8 @@ causal (trailing) and raw. It reports how the fitted ``t90 ~ L`` line and the
 two-room bridge effect move with the definition, so the report can state which
 conclusions are robust to the measurement rule.
 
-The law fit reuses ``config_summary`` + ``fit_law`` (the headline convention,
-including its all-seed median), so the symmetric column reproduces the headline
-line; the censoring-aware refit of the law is a separate concern (review #3).
+The law fit reuses the Kaplan–Meier medians from ``config_summary`` and
+``fit_law``, so the symmetric column reproduces the headline line.
 
 Usage:
     python scripts/check_threshold_sensitivity.py

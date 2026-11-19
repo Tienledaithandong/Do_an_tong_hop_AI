@@ -317,17 +317,19 @@ def test_common_validation_requires_population_at_least_number_of_options():
     assert webapp._common({"N": 30, "n": 30})["N"] == 30
 
 
-def test_t90_summary_is_conditional_and_censoring_aware():
+def test_t90_summary_uses_the_population_kaplan_meier_median():
     # Two of three runs censor at the horizon; the sentinel must not enter the
     # median, and with no hits the median is undefined rather than the horizon.
     summary = webapp._t90_summary(np.array([5.0, 11.0, 11.0]), np.array([True, False, False]), 10)
-    assert summary["t90_median"] == pytest.approx(5.0)
+    assert summary["t90_median"] is None
     assert summary["hit_rate"] == pytest.approx(1 / 3)
     assert summary["t90_rmst"] == pytest.approx(5 + 5 * 2 / 3)
     none_hit = webapp._t90_summary(np.array([11.0, 11.0]), np.zeros(2, dtype=bool), 10)
     assert none_hit["t90_median"] is None
     assert none_hit["hit_rate"] == 0.0
     assert none_hit["t90_rmst"] == pytest.approx(10.0)
+    half_hit = webapp._t90_summary(np.array([2, 4, 11, 11]), np.array([True, True, False, False]), 10)
+    assert half_hit["t90_median"] == 4
 
 
 def test_family_parameters_are_clamped_to_the_graph_size():

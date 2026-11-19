@@ -44,7 +44,7 @@ from scipy import sparse
 
 from .bandit import SCENARIOS, make_q
 from .analysis import law_diagnostics
-from .config import BRIDGE_P, HEAVY_TAIL, RGG_C, RUN_ALL, WS_P
+from .config import BRIDGE_P, RGG_C, RUN_ALL, WS_P
 from .graph_sweep import reference_mrd, simulate_on_graph
 from .graphs import (
     average_path_length,
@@ -53,7 +53,7 @@ from .graphs import (
     relaxation_time,
     two_room_graph,
 )
-from .metrics import rmst, t90
+from .metrics import kaplan_meier_median, rmst, t90
 from .plots import COLORS, config_summary, fit_law
 from .reproduce import run_reproduction
 
@@ -251,17 +251,12 @@ def _common(payload: dict) -> dict[str, Any]:
 
 
 def _t90_summary(t90: np.ndarray, hit: np.ndarray, steps: int) -> dict[str, Any]:
-    """Censoring-aware threshold-time summary.
-
-    The median is conditional on the seeds that actually reached the threshold
-    (``None`` when none did); the censoring sentinel is never averaged in as if
-    it were an observed time. RMST and the hit rate carry the censoring info.
-    """
+    """Use the same population median as the report, with RMST and hit rate."""
     t90 = np.asarray(t90, dtype=float)
     hit = np.asarray(hit, dtype=bool)
-    reached = t90[hit]
+    median = kaplan_meier_median(t90, hit)
     return {
-        "t90_median": float(np.median(reached)) if reached.size else None,
+        "t90_median": median if math.isfinite(median) else None,
         "t90_rmst": rmst(t90, hit, steps),
         "hit_rate": float(hit.mean()),
     }
@@ -539,13 +534,12 @@ def _plot_compare(rows: list[dict[str, Any]], fit: dict[str, Any]) -> bytes:
             if row[x_key] is None or row["t90_median"] is None:
                 continue
             color = FAMILY_COLORS.get(row["family"], "#555555")
-            censored = row["hit_rate"] < 0.5
             ax.scatter(
                 row[x_key],
                 row["t90_median"],
                 s=52,
-                color="none" if censored else color,
-                edgecolors=color if censored else "white",
+                color=color,
+                edgecolors="white",
                 linewidths=1.2,
                 zorder=3,
                 label=row["family_label"] if row["family"] not in seen else None,
@@ -558,7 +552,7 @@ def _plot_compare(rows: list[dict[str, Any]], fit: dict[str, Any]) -> bytes:
     seen: set[str] = set()
     scatter(axes[0], "tau", True)
     axes[0].set_xlabel(r"Thời gian relaxation  $\tau = 1/(1-\lambda_2)$", fontsize=10)
-    axes[0].set_ylabel("t₉₀ (bước)", fontsize=10)
+    axes[0].set_ylabel("Trung vị Kaplan–Meier của t₉₀ (bước)", fontsize=10)
     axes[0].set_title("(a) Theo thời gian trộn phổ", fontsize=11)
     _style_axes(axes[0])
     if seen:
@@ -571,14 +565,17 @@ def _plot_compare(rows: list[dict[str, Any]], fit: dict[str, Any]) -> bytes:
         axes[1].plot(
             xs, fit["intercept"] + fit["slope"] * xs, color="#3a3f47", linewidth=1.3
         )
+        fit_label = "t₉₀ = %.2f + %.2f·L" % (fit["intercept"], fit["slope"])
+        if fit["r2"] is not None:
+            fit_label += "\nR² = %.3f" % fit["r2"]
         axes[1].annotate(
-            "t₉₀ = %.2f + %.2f·L\nR² = %.3f" % (fit["intercept"], fit["slope"], fit["r2"]),
+            fit_label,
             xy=(0.04, 0.80),
             xycoords="axes fraction",
             fontsize=9,
         )
     axes[1].set_xlabel("Đường đi trung bình  L", fontsize=10)
-    axes[1].set_ylabel("t₉₀ (bước)", fontsize=10)
+    axes[1].set_ylabel("Trung vị Kaplan–Meier của t₉₀ (bước)", fontsize=10)
     axes[1].set_title("(b) Theo khoảng cách thông tin", fontsize=11)
     _style_axes(axes[1])
     fig.tight_layout()
@@ -1079,6 +1076,13 @@ class HiveHandler(BaseHTTPRequestHandler):
             stored = {
                 name: (RESULTS_DIR / f"{name}.csv").exists() for name in STORED_RESULTS
             }
+            intercept = slope = None
+            if stored["graph_sweep"]:
+                try:
+                    sweep = pd.read_csv(RESULTS_DIR / "graph_sweep.csv")
+                    intercept, slope, _, _ = fit_law(config_summary(sweep))
+                except (OSError, ValueError, KeyError):
+                    pass
             return self.send_json(
                 HTTPStatus.OK,
                 {
@@ -1098,8 +1102,8 @@ class HiveHandler(BaseHTTPRequestHandler):
                     "stored_results": stored,
                     "report_available": REPORT_PDF.exists(),
                     "heavy_tail_reference": {
-                        "intercept": HEAVY_TAIL["intercept"],
-                        "slope": HEAVY_TAIL["slope"],
+                        "intercept": intercept,
+                        "slope": slope,
                     },
                     "run_all": RUN_ALL,
                 },

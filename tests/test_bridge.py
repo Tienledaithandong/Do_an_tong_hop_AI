@@ -41,12 +41,13 @@ def test_arrival_events_counts_invasions_and_extinctions():
 def test_censored_median_is_infinite_when_most_seeds_miss():
     values = np.array([10.0, 20.0, 99.0, 99.0])
     hit = np.array([True, True, False, False])
-    assert censored_median(values, hit) == np.inf
+    assert censored_median(values, hit) == 20.0  # first KM survival <= 0.5
+    assert censored_median(values, np.array([True, False, False, False])) == np.inf
     assert censored_median(values[:3], np.array([True, True, True])) == 20.0
 
 
 def test_censored_median_ignores_value_of_unreached_seeds():
-    values = np.array([5.0, 7.0, 1.0])
+    values = np.array([5.0, 7.0, 99.0])
     hit = np.array([True, True, False])
     assert censored_median(values, hit) == 7.0
 
@@ -132,8 +133,10 @@ def test_run_replicates_shapes_and_summary():
     assert df["t_first"].min() >= 1
     summary = summarise(df, n_boot=50)
     assert list(summary["bridge"]) == [2, 6]
-    assert (summary["graphs"] == 2).all()
+    assert (summary["graphs"] == 1).all()
     assert (summary["runs"] == 6).all()
+    assert not df["seed"].duplicated().any()
+    assert {"t50_raw", "hit50_raw", "paired50_first_mean", "paired50_after_mean"} <= set(df.columns) | set(summary.columns)
     assert (df["arrivals"] >= df["extinctions"]).all()
     assert {"arrivals_mean", "extinctions_mean"} <= set(summary.columns)
 
@@ -167,6 +170,39 @@ def test_sparse_rooms_lower_tau_but_keep_phi():
     assert sparse["phi"].iloc[0] == clique["phi"].iloc[0]
     assert sparse["tau"].mean() < clique["tau"].mean() / 3
     assert sparse["phi_deg"].iloc[0] > clique["phi_deg"].iloc[0]
+    assert sparse["graph_seed"].nunique() == 2
+    assert not sparse["seed"].duplicated().any()
+
+
+def test_single_clique_bootstrap_resamples_trajectories():
+    values = np.arange(1.0, 21.0)
+    lo, hi = bootstrap_ci(values, np.ones(20, bool), n_boot=300,
+                          cluster=np.zeros(20), resample_within_cluster=True)
+    assert lo < hi
+
+
+def test_paired_timing_split_uses_same_raw_hit_trajectories():
+    import pandas as pd
+
+    df = pd.DataFrame({
+        "N": [20] * 4, "bridge": [1] * 4, "graph_seed": [0] * 4,
+        "tau": [10.] * 4, "path_length": [2.] * 4,
+        "t_first": [1., 8., 1., 101.], "hit_first": [True, True, True, False],
+        "t50": [20., 10., 101., 101.], "hit50": [True, True, False, False],
+        "t50_raw": [21., 12., 101., 101.], "hit50_raw": [True, True, False, False],
+        "t90": [25., 14., 101., 101.], "hit90": [True, True, False, False],
+        "final_target": [1., 1., 0., 0.], "arrivals": [1, 1, 1, 0], "extinctions": [0, 0, 1, 0],
+    })
+    row = summarise(df, n_boot=20).iloc[0]
+    assert row["paired50_count"] == 2
+    assert row["paired50_rate"] == .5
+    assert row["paired50_first_mean"] == pytest.approx(4.5)
+    assert row["paired50_after_mean"] == pytest.approx(12.)
+    assert row["paired50_total_mean"] == pytest.approx(16.5)
+    assert row["paired50_first_fraction_median"] == pytest.approx((1/21 + 8/12)/2)
+    # Missing raw observations from historical CSVs cannot produce a split.
+    old = summarise(df.drop(columns=["t50_raw", "hit50_raw"]), n_boot=20).iloc[0]
+    assert np.isnan(old["paired50_rate"])
 
 
 def test_fit_loglog_multi_separates_two_predictors():

@@ -14,6 +14,8 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
+from .metrics import kaplan_meier_median
+
 L_REF = 2.0
 
 
@@ -112,12 +114,9 @@ def _collapse_graphs(
 ) -> tuple[float, float]:
     """One (L, t90) point from a config's graphs: mean L, mean of per-graph medians.
 
-    Each graph is ``(L, t90, hit)``. The per-graph median is taken over the
-    *hit* seeds only, so a censoring sentinel never enters as an observed time.
-    With ``rng`` the (t90, hit) pairs inside each graph are resampled together
-    first, so censoring is handled inside every bootstrap replicate; a resample
-    with no hit seeds contributes no median and is left out of that replicate's
-    config mean (NaN if the whole config has none).
+    Each graph is ``(L, t90, hit)``. Resample event/time pairs together and
+    estimate the Kaplan–Meier median. Include both L and the median for the
+    same graphs, skipping graphs whose median cannot be observed.
     """
     ls: list[float] = []
     ts: list[float] = []
@@ -125,11 +124,13 @@ def _collapse_graphs(
         if rng is not None:
             idx = rng.integers(0, t90s.size, t90s.size)
             t90s, hits = t90s[idx], hits[idx]
-        reached = t90s[hits]
-        ls.append(length)
-        ts.append(float(np.median(reached)) if reached.size else float("nan"))
-    finite = [t for t in ts if np.isfinite(t)]
-    return float(np.mean(ls)), float(np.mean(finite)) if finite else float("nan")
+        median = kaplan_meier_median(t90s, hits)
+        if np.isfinite(length) and np.isfinite(median):
+            ls.append(length)
+            ts.append(median)
+    if not ts:
+        return float("nan"), float("nan")
+    return float(np.mean(ls)), float(np.mean(ts))
 
 
 def hierarchical_bootstrap_law(
@@ -140,11 +141,11 @@ def hierarchical_bootstrap_law(
     ``seeds`` has one row per (config, graph, swarm seed) with columns
     ``config``, ``graph_seed``, ``path_length``, ``t90`` and ``t90_hit``. The
     point estimate collapses each config to one (mean L, mean per-graph
-    hit-only median t90) point and fits OLS. Each bootstrap replicate resamples
+    Kaplan–Meier median t90) point and fits OLS. Each bootstrap replicate resamples
     graphs with replacement within every config and (t90, hit) pairs within each
     drawn graph, then refits, so the CI reflects both levels of variation and
-    censoring is handled inside each resample. Replicates whose resamples leave
-    a config with no hit seeds are skipped rather than averaged with sentinels.
+    censoring is handled inside each resample. Replicates that leave any
+    configuration without an observable median are skipped.
 
     Note this CI conditions on the *fixed* set of configurations: it does not
     reflect sensitivity to adding/removing configs or graph families (see
@@ -166,8 +167,9 @@ def hierarchical_bootstrap_law(
     if len(configs) < 3:
         return {"n_configs": len(configs), "error": "cần ít nhất 3 cấu hình"}
 
-    x = np.array([_collapse_graphs(groups[c])[0] for c in configs])
-    y = np.array([_collapse_graphs(groups[c])[1] for c in configs])
+    x, y = np.asarray([_collapse_graphs(groups[c]) for c in configs]).T
+    if not (np.all(np.isfinite(x)) and np.all(np.isfinite(y))):
+        return {"n_configs": len(configs), "error": "có cấu hình chưa quan sát được trung vị"}
     intercept, slope, r2 = _fit_line(x, y)
 
     rng = np.random.default_rng(seed)
@@ -191,7 +193,7 @@ def hierarchical_bootstrap_law(
         r2s.append(r_b)
         predictions.append(i_b + s_b * L_REF)
     if not slopes:
-        return {"n_configs": len(configs), "error": "không mẫu bootstrap nào đủ seed đạt"}
+        return {"n_configs": len(configs), "error": "không có mẫu bootstrap đủ trung vị quan sát"}
 
     q = lambda draws: [float(np.percentile(draws, 2.5)), float(np.percentile(draws, 97.5))]
     return {

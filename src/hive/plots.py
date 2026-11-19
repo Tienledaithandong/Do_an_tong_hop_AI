@@ -13,6 +13,8 @@ from matplotlib.ticker import NullFormatter
 import numpy as np
 import pandas as pd
 
+from .metrics import kaplan_meier_median
+
 COLORS = {
     "well_mixed": "#1f77b4",
     "pmcl": "#ff7f0e",
@@ -61,7 +63,7 @@ def plot_reproduction(curves: dict[str, np.ndarray], out_dir: Path) -> list[Path
 
 
 def config_summary(df: pd.DataFrame) -> pd.DataFrame:
-    """Per-config summary; ``t90`` is the all-seed (Kaplan–Meier-style) median with censored seeds at the horizon sentinel, unlike the hit-only conditional medians in analysis.py."""
+    """Summarise each configuration using a Kaplan–Meier median for t90."""
     rows = []
     for (family, param), group in df.groupby(["family", "param"]):
         rows.append(
@@ -70,7 +72,7 @@ def config_summary(df: pd.DataFrame) -> pd.DataFrame:
                 "param": param,
                 "tau": group["tau"].iloc[0],
                 "path_length": group["path_length"].iloc[0],
-                "t90": group["t90"].median(),
+                "t90": kaplan_meier_median(group["t90"], group["t90_hit"]),
                 "hit_rate": group["t90_hit"].mean(),
                 "final": group["final_best_mass"].median(),
                 "final95": (group["final_best_mass"] >= 0.95).mean(),
@@ -110,11 +112,12 @@ def fit_law(summary: pd.DataFrame) -> tuple[float, float, float, int]:
     ]
     x = train["path_length"].to_numpy(float)
     y = train["t90"].to_numpy(float)
-    if x.size < 3:
+    if x.size < 3 or np.ptp(x) == 0.0:
         return float("nan"), float("nan"), float("nan"), int(x.size)
     slope, intercept = np.polyfit(x, y, 1)
     predicted = intercept + slope * x
-    r2 = 1.0 - np.sum((y - predicted) ** 2) / np.sum((y - y.mean()) ** 2)
+    total = np.sum((y - y.mean()) ** 2)
+    r2 = 1.0 - np.sum((y - predicted) ** 2) / total if total > 0 else float("nan")
     return float(intercept), float(slope), float(r2), int(x.size)
 
 
@@ -143,20 +146,10 @@ def plot_law(df: pd.DataFrame, out_dir: Path) -> list[Path]:
             )
             ax.plot(xs, intercept + slope * np.log10(xs), color=COLORS[family],
                     linewidth=1.0, alpha=0.7)
-    censored = summary[summary["hit_rate"] < 0.5]
-    if not censored.empty:
-        ax.scatter(
-            censored["tau"],
-            censored["t90"],
-            s=40,
-            facecolors="none",
-            edgecolors="0.4",
-            label="bị censor (<50% seed)",
-        )
     ax.set_xscale("log")
     ax.set_ylim(0, None)
     ax.set_xlabel(r"Thời gian relaxation  $\tau = 1/(1-\lambda_2)$")
-    ax.set_ylabel("Số bước đạt 90% phương án tốt nhất")
+    ax.set_ylabel("Trung vị Kaplan–Meier của t₉₀ (bước)")
     ax.set_title("(a) Thời gian relaxation: hai xu hướng tách nhau")
     ax.legend(frameon=False, fontsize=8)
     ax.grid(alpha=0.3, which="both")
@@ -176,7 +169,7 @@ def plot_law(df: pd.DataFrame, out_dir: Path) -> list[Path]:
     # Calibrate on the non-intervention configurations and keep the two-room
     # graphs as a held-out check, so the line is not fitted to its test points.
     intercept, slope, r2, n_train = fit_law(measured)
-    if n_train >= 3:
+    if np.isfinite(slope):
         xs = np.linspace(0.0, measured["path_length"].max() * 1.05, 50)
         ax.plot(xs, intercept + slope * xs, color="0.2", linewidth=1.2)
         ax.annotate(
@@ -188,7 +181,7 @@ def plot_law(df: pd.DataFrame, out_dir: Path) -> list[Path]:
         )
     ax.set_ylim(0, None)
     ax.set_xlabel(r"Đường đi trung bình  $L$")
-    ax.set_ylabel("Số bước đạt 90% phương án tốt nhất")
+    ax.set_ylabel("Trung vị Kaplan–Meier của t₉₀ (bước)")
     ax.set_title("(b) Đường đi trung bình dự báo cả hai họ")
     ax.legend(frameon=False, fontsize=8)
     ax.grid(alpha=0.3)
@@ -242,7 +235,7 @@ def plot_graph_seeds(
         )
     ax.set_ylim(0, None)
     ax.set_xlabel(r"Đường đi trung bình  $L$  (trung bình $\pm$ SD qua các graph)")
-    ax.set_ylabel("Số bước đạt 90% (trung bình median mỗi graph)")
+    ax.set_ylabel("Trung bình trung vị Kaplan–Meier mỗi đồ thị (bước)")
     ax.set_title("Quy luật L hiệu chuẩn trên nhiều graph seed")
     ax.legend(frameon=False, fontsize=8)
     ax.grid(alpha=0.3)
@@ -293,7 +286,7 @@ def plot_threshold_sensitivity(
             )
     axl.set_ylim(0, None)
     axl.set_xlabel(r"Đường đi trung bình  $L$")
-    axl.set_ylabel("Số bước đạt 90% (median mỗi cấu hình)")
+    axl.set_ylabel("Trung vị Kaplan–Meier của t₉₀ (bước)")
     axl.set_title("Quy luật L theo định nghĩa ngưỡng")
     axl.legend(frameon=False, fontsize=8)
     axl.grid(alpha=0.3)
@@ -410,6 +403,13 @@ def plot_two_room_source(
             medians.append(median)
             lower.append(median - lo)
             upper.append(hi - median)
+            if np.isfinite(median):
+                n_total = int((per_seed["bridge"] == bridge).sum())
+                ax.annotate(
+                    f"{len(values)}/{n_total}", (bridge + offset, hi),
+                    xytext=(0, 3), textcoords="offset points", ha="center",
+                    color=color, fontsize=6,
+                )
         ax.errorbar(
             xs,
             medians,
@@ -421,8 +421,8 @@ def plot_two_room_source(
             label="50% buồng đích" if metric == "t50_target" else "90% buồng đích",
         )
     ax.set_xlabel("Số cạnh cầu nối hai buồng")
-    ax.set_ylabel("Số bước (trung vị, CI 95%)")
-    ax.set_title("(b) Thời gian qua cầu")
+    ax.set_ylabel("Số bước (trung vị có điều kiện, CI 95%)")
+    ax.set_title("(b) Chỉ seed đạt ngưỡng (số đạt/tổng)")
     ax.legend(frameon=False, fontsize=8)
     ax.grid(alpha=0.3)
 
@@ -431,7 +431,7 @@ def plot_two_room_source(
 
 
 def plot_two_room_replicates(summary: pd.DataFrame, out_dir: Path) -> list[Path]:
-    """Wait at the bridge vs conductance, and the split of the delay."""
+    """Threshold times and the paired mean split, conditional on raw t50 hit."""
     sizes = sorted(summary["N"].unique())
     colors = plt.cm.viridis(np.linspace(0.15, 0.85, len(sizes)))
     fig, axes = plt.subplots(1, 2, figsize=(11.0, 4.2))
@@ -476,24 +476,31 @@ def plot_two_room_replicates(summary: pd.DataFrame, out_dir: Path) -> list[Path]
     x = np.arange(len(bridges))
     for k, (color, N) in enumerate(zip(colors, sizes)):
         sub = summary[summary["N"] == N].set_index("bridge").reindex(bridges)
-        first = sub["t_first_median"].to_numpy(dtype=float)
-        total = sub["t50_median"].to_numpy(dtype=float)
+        first = sub["paired50_first_mean"].to_numpy(dtype=float)
+        after = sub["paired50_after_mean"].to_numpy(dtype=float)
         pos = x - 0.4 + width * (k + 0.5)
         ax.bar(pos, first, width * 0.95, color=color, label=f"N={N}: chờ ở cầu")
         ax.bar(
             pos,
-            np.where(np.isfinite(total), total - first, 0.0),
+            after,
             width * 0.95,
             bottom=first,
             color=color,
             alpha=0.4,
-            label=f"N={N}: lan trong buồng",
+            label=f"N={N}: sau lần đầu tới",
         )
+        for i, (_, row) in enumerate(sub.iterrows()):
+            if np.isfinite(first[i]) and np.isfinite(after[i]):
+                ax.annotate(
+                    f"{int(row['paired50_count'])}/{int(row['runs'])}",
+                    (pos[i], first[i] + after[i]), xytext=(0, 2),
+                    textcoords="offset points", ha="center", fontsize=5,
+                )
     ax.set_xticks(x)
     ax.set_xticklabels([str(b) for b in bridges])
     ax.set_xlabel("độ rộng cầu (số cạnh)")
-    ax.set_ylabel("trung vị số bước tới t50")
-    ax.set_title("(b) Tách độ trễ: chờ ở cầu và lan trong buồng")
+    ax.set_ylabel("trung bình số bước tới t50 thô")
+    ax.set_title("(b) Cùng trajectory đạt t50 thô (số đạt/tổng)")
     ax.legend(fontsize=6.5, ncol=2)
     ax.grid(alpha=0.3, axis="y")
 

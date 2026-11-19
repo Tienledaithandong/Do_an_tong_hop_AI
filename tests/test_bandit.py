@@ -53,3 +53,22 @@ def test_expected_rewards_matches_monte_carlo_of_sampled_rewards():
     rewards = sample_rewards(q, actions, 0.5, np.random.default_rng(7))
     means = np.array([rewards[actions == a].mean() for a in range(3)])
     assert np.allclose(means, expected_rewards(q, 0.5), atol=0.01)
+
+
+def test_expected_rewards_handles_intervals_outside_and_across_bounds():
+    # U(-3.5,-2.5) and U(2.5,3.5) collapse to the endpoints.
+    # U(-0.6,0.4) has mean 0.08 after clipping; U(0.6,1.6)
+    # has mean 0.92. U(-0.8,1.2) spans both endpoints, mean 0.35.
+    q = np.array([-3.0, -0.1, 1.1, 3.0])
+    assert expected_rewards(q, 0.5) == pytest.approx([0.0, 0.08, 0.92, 1.0])
+    assert expected_rewards(np.array([0.2]), 1.0) == pytest.approx([0.35])
+
+
+def test_expected_rewards_with_tiny_positive_delta_stays_finite():
+    q = np.array([0.0, 0.5, 1.0])
+    with np.errstate(all="raise"):
+        means = expected_rewards(q, 1e-300)
+    assert np.isfinite(means).all()
+    assert means[0] == pytest.approx(2.5e-301, rel=1e-14, abs=0.0)
+    assert means[1] == 0.5
+    assert means[2] == 1.0

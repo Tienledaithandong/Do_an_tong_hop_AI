@@ -56,9 +56,9 @@ def threshold_time(
     *before* the raw signal appears, so it is a property of the smoothed curve,
     not the physical first passage time — use ``"causal"``/``"raw"`` for that.
 
-    Returns ``(step, hit)``. When the threshold is never reached the horizon is
-    returned with ``hit=False``, so callers can report censoring instead of
-    silently averaging a fake value.
+    Returns ``(step, hit)``. When the threshold is never reached the sentinel
+    ``len(curve)`` (one past the last observed step) is returned with
+    ``hit=False``. Use the event flag when summarising threshold times.
     """
     curve = np.asarray(curve, dtype=float)
     if curve.size == 0:
@@ -121,6 +121,29 @@ def kaplan_meier(
             knots_t.append(float(t))
             knots_s.append(surv)
     return np.asarray(knots_t), np.asarray(knots_s)
+
+
+def kaplan_meier_median(times: np.ndarray, events: np.ndarray) -> float:
+    """First observed time at which Kaplan–Meier survival is at most 0.5.
+
+    Returns NaN when that time is not observed. With common administrative
+    censoring, the median is the ceil(n/2)-th event, when it exists. The
+    one-past-horizon sentinel may therefore be used for censored runs here.
+    """
+    times = np.asarray(times, dtype=float)
+    events = np.asarray(events, dtype=bool)
+    if times.shape != events.shape:
+        raise ValueError("times and events must have the same shape")
+    reached = times[events]
+    if not reached.size:
+        return float("nan")
+    censored = times[~events]
+    if not censored.size or censored.min() >= reached.max():
+        index = (times.size - 1) // 2
+        return float(np.partition(reached, index)[index]) if index < reached.size else float("nan")
+    knots, survival = kaplan_meier(times, events)
+    crossed = np.flatnonzero(survival <= 0.5 + 1e-12)
+    return float(knots[crossed[0]]) if crossed.size else float("nan")
 
 
 def rmst(times: np.ndarray, events: np.ndarray, horizon: float) -> float:

@@ -34,13 +34,25 @@ def expected_rewards(q: np.ndarray, delta: float) -> np.ndarray:
         return np.clip(q, 0.0, 1.0)
     lo = q - delta
     hi = q + delta
-    width = hi - lo
-    a = np.maximum(lo, 0.0)
-    b = np.minimum(hi, 1.0)
-    mid_mass = np.clip(b - a, 0.0, None) / width
-    mid_mean = np.where(b > a, (a + b) / 2.0, 0.0)
-    p_above = np.clip(hi - 1.0, 0.0, None) / width
-    return mid_mass * mid_mean + p_above
+    result = np.empty_like(q)
+    below = hi <= 0.0
+    above = lo >= 1.0
+    inside = (lo >= 0.0) & (hi <= 1.0) & ~below & ~above
+    lower = (lo < 0.0) & (hi > 0.0) & (hi <= 1.0)
+    upper = (lo >= 0.0) & (lo < 1.0) & (hi > 1.0)
+    both = (lo < 0.0) & (hi > 1.0)
+
+    result[below] = 0.0
+    result[above] = 1.0
+    # Retain the previous mean for unclipped intervals, including the same
+    # floating-point rounding, while avoiding a zero width for tiny delta.
+    result[inside] = (lo[inside] + hi[inside]) / 2.0
+    # Divide before multiplying to avoid underflow when delta is tiny.
+    result[lower] = 0.25 * hi[lower] * (hi[lower] / delta)
+    gap = 1.0 - lo[upper]
+    result[upper] = 1.0 - 0.25 * gap * (gap / delta)
+    result[both] = 0.5 + 0.5 * ((q[both] - 0.5) / delta)
+    return result
 
 
 def sample_rewards(
